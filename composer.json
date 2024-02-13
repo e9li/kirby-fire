@@ -1,5 +1,5 @@
 {
-    "name": "e9li/fire",
+    "name": "e9li/kirby-fire",
     "description": "Generate cache with command",
     "type": "kirby-plugin",
     "license": "MIT",
@@ -11,6 +11,10 @@
             "homepage": "https://www.e9li.com"
         }
     ],
+    "support": {
+        "docs": "https://github.com/e9li/kirby-fire/blob/main/README.md",
+        "source": "https://github.com/e9li/kirby-fire"
+    },
     "keywords": [
         "kirby",
         "kirby-cms",
