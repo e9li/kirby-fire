@@ -128,7 +128,7 @@
     null,
     null
   );
-  __component__.options.__file = "/Users/rafael/Sites/hech/site/plugins/fire/src/FireView.vue";
+  __component__.options.__file = "/Users/rafael/Sites/hech/site/plugins/kirby-fire/src/FireView.vue";
   const FireView = __component__.exports;
   panel.plugin("e9li/fire", {
     icons: {
