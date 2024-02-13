@@ -1,0 +1,32 @@
+{
+    "name": "e9li/fire",
+    "description": "Generate cache with command",
+    "type": "kirby-plugin",
+    "license": "MIT",
+    "version": "0.1.0",
+    "authors": [
+        {
+            "name": "Rafael Egli",
+            "email": "rafael@e9li.com",
+            "homepage": "https://www.e9li.com"
+        }
+    ],
+    "keywords": [
+        "kirby",
+        "kirby-cms",
+        "kirby-plugin",
+        "cache"
+    ],
+    "config": {
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "getkirby/composer-installer": true
+        }
+    },
+    "require": {
+        "php": ">=8.2.0",
+        "getkirby/composer-installer": "^1.2",
+        "symfony/http-client": "^7.0",
+        "symfony/browser-kit": "^7.0"
+    }
+}
