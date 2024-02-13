@@ -49,7 +49,7 @@
 
 <script>
 export default {
-    name: "fire",
+    name: "fireView",
     data() {
         return {
             isHeatingUp: false,

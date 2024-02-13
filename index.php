@@ -6,7 +6,7 @@ use Kirby\Cms\App;
 use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\HttpClient\HttpClient;
 
-App::plugin('e9li/fire', [
+App::plugin('e9li/kirby-fire', [
     'commands' => [
         'fire:up' => [
             'description' => 'generate page cache',
