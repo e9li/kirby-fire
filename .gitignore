@@ -1,0 +1,14 @@
+# System files
+# ------------
+
+Icon
+.DS_Store
+
+
+# Editors
+# ---------------
+*.sublime-project
+*.sublime-workspace
+/.vscode
+/.idea
+/.idea/*
