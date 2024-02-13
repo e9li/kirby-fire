@@ -3,7 +3,7 @@
     "description": "Generate cache with command",
     "type": "kirby-plugin",
     "license": "MIT",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "authors": [
         {
             "name": "Rafael Egli",
@@ -13,7 +13,8 @@
     ],
     "support": {
         "docs": "https://github.com/e9li/kirby-fire/blob/main/README.md",
-        "source": "https://github.com/e9li/kirby-fire"
+        "source": "https://github.com/e9li/kirby-fire",
+        "issues": "https://github.com/e9li/kirby-fire/issues"
     },
     "keywords": [
         "kirby",
