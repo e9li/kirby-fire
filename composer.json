@@ -3,7 +3,7 @@
     "description": "Generate cache with command",
     "type": "kirby-plugin",
     "license": "MIT",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "authors": [
         {
             "name": "Rafael Egli",
