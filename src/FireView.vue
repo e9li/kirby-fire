@@ -1,5 +1,5 @@
 <template>
-    <k-inside>
+    <k-panel-inside>
         <k-header data-has-buttons="true">
             <k-header-title>Fire up your cache!</k-header-title>
             <k-header-buttons slot="buttons">
@@ -8,6 +8,7 @@
                     <k-button v-if="!isHeatingUp && index !== 0" variant="filled" icon="fire" theme="positive" @click="start()">Continue</k-button>
                     <k-button v-if="!isHeatingUp && index !== 0" variant="filled" icon="cancel" theme="negative" @click="reset()">Extinguish</k-button>
                     <k-button v-if="isHeatingUp" variant="filled" icon="cancel" theme="negative" @click="pause()">Stop</k-button>
+                    <k-button v-if="!isHeatingUp" variant="filled" icon="trash" @click="clearCache()">Clear cache</k-button>
                 </k-button-group>
             </k-header-buttons>
         </k-header>
@@ -23,18 +24,20 @@
                     </tr>
                     </thead>
                     <tbody>
-                    <tr v-for="(item, i) in items" :key="i" :ref="'row' + i">
+                    <tr v-for="(item, i) in items" :key="item.url">
                         <td class="k-table-index-column">
                             <span class="k-table-index">{{ i + 1 }}</span>
                         </td>
                         <td data-mobile="true">
                             <div class="truncate">{{ item.url }}</div>
+                            <div v-if="item.error" class="error">{{ item.error }}</div>
                         </td>
                         <td class="k-state-column" data-mobile="true">
                             <div class="badge" :class="item.state">
                                 <k-icon v-if="item.state === 'no-fire'" type="blaze"/>
                                 <k-icon v-if="item.state === 'fire-up'" type="fire"/>
                                 <k-icon v-if="item.state === 'fire-on'" type="fireFilled"/>
+                                <k-icon v-if="item.state === 'extinguished'" type="cancel"/>
                                 <span>{{ stateText(item.state) }}</span>
                             </div>
                         </td>
@@ -44,10 +47,13 @@
             </div>
         </k-grid>
 
-    </k-inside>
+    </k-panel-inside>
 </template>
 
 <script>
+// pause between requests, keeps the server from being hammered
+const PACE_MS = 150;
+
 export default {
     name: "fireView",
     data() {
@@ -55,28 +61,65 @@ export default {
             isHeatingUp: false,
             index: 0,
             items: [],
+            known: new Set(),
         }
     },
     created() {
-        this.$api.get("fire/pages").then((data) => {
-            this.items = data;
-        });
+        this.load();
     },
     methods: {
         stateText(state) {
             return state.replace(/-/g, " ");
         },
+        load() {
+            this.$api.get("fire/pages").then((data) => {
+                this.items = data;
+                this.known = new Set(data.map((item) => item.url));
+            });
+        },
+        queueMedia(index, media) {
+            // thumbs of a warmed page are queued right behind it, so Kirby's
+            // media route generates them as part of the same crawl
+            const fresh = (media || []).filter((url) => !this.known.has(url));
+
+            fresh.forEach((url) => this.known.add(url));
+
+            if (fresh.length > 0) {
+                const additions = fresh.map((url) => ({
+                    url,
+                    language: this.items[index].language,
+                    state: "no-fire",
+                }));
+                this.items.splice(index + 1, 0, ...additions);
+            }
+        },
         heatUp(index) {
             this.index = index;
-            if (index < this.items.length && this.isHeatingUp === true) {
-                this.items[index].state = "fire-up";
-                this.$api.post("fire/up", this.items[index]).then((data) => {
-                    this.$set(this.items, index, data);
+
+            if (index >= this.items.length || this.isHeatingUp !== true) {
+                return;
+            }
+
+            this.items[index].state = "fire-up";
+
+            this.$api.post("fire/up", this.items[index])
+                .then((data) => {
+                    this.items[index] = data;
+                    this.queueMedia(index, data.media);
+                })
+                .catch(() => {
+                    // a failed request must not stall the crawl
+                    this.items[index] = {
+                        ...this.items[index],
+                        state: "extinguished",
+                        error: "Request failed",
+                    };
+                })
+                .finally(() => {
                     setTimeout(() => {
                         this.heatUp(index + 1);
-                    }, 500);
+                    }, PACE_MS);
                 });
-            }
         },
         start() {
             this.isHeatingUp = true;
@@ -88,8 +131,11 @@ export default {
         reset() {
             this.isHeatingUp = false;
             this.index = 0;
-            this.$api.get("fire/pages").then((data) => {
-                this.items = data;
+            this.load();
+        },
+        clearCache() {
+            this.$api.post("fire/clear").then(() => {
+                this.reset();
             });
         },
     },
@@ -99,7 +145,7 @@ export default {
 <style lang="scss" scoped>
 
 .k-table-index-column {
-    width: 3rem;
+    width: 4.5rem;
 }
 
 .k-bar {
@@ -110,6 +156,11 @@ export default {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.error {
+    color: var(--color-red-600);
+    font-size: var(--text-xs);
 }
 
 .badge {
@@ -132,6 +183,12 @@ export default {
     padding-left: var(--spacing-1);
     background: var(--color-green-300);
     color: var(--color-green-800);
+}
+
+.extinguished {
+    padding-left: var(--spacing-1);
+    background: var(--color-red-300);
+    color: var(--color-red-800);
 }
 
 .k-language-column {
