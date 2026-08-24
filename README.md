@@ -38,13 +38,18 @@ If you found a bug or have a suggestion, you can either:
 ## Commands
 
 ```bash
-kirby fire:up                 # crawl every page in every language, then its thumbs
-kirby fire:up --no-media      # …without the thumbs
-kirby fire:thumbs             # render pending thumbs in-process
+kirby fire:up                     # crawl every page in every language, then its thumbs
+kirby fire:up --no-media          # …without the thumbs
+kirby fire:up --concurrency 10    # crawl with 10 requests in flight (default 5)
+kirby fire:up --insecure          # skip TLS verification (local dev certificates)
+kirby fire:thumbs                 # render pending thumbs in-process
 ```
 
-`fire:up` warms the page cache by requesting every page over HTTP, and picks the
-thumbs out of the returned `src`/`srcset` attributes so a crawl warms those too.
+`fire:up` warms the page cache by requesting every page over HTTP — with up to
+`--concurrency` requests in flight — and picks the thumbs out of the returned
+`src`/`srcset` attributes so a crawl warms those too. Thumb requests are
+dropped as soon as the status line arrives: Kirby generates the thumbnail
+before the first body byte, so the images themselves are never downloaded.
 
 The error page is warmed like any other page — an image-rich 404 page profits
 just as much. It answers with HTTP 404 by design, so for this one page that
@@ -52,9 +57,10 @@ status counts as warmed instead of failed.
 
 Kirby does not generate a thumbnail while a page renders — it writes one job file
 per thumb and runs the darkroom only when the media URL is first requested. So
-`fire:up`'s thumb pass costs a full HTTP request and response body per size per
-image. `fire:thumbs` works the pending jobs off directly instead, which is what
-makes the two-step form worth using on a large site:
+`fire:up`'s thumb pass still costs one HTTP round-trip per size per image, even
+though no bodies are transferred. `fire:thumbs` works the pending jobs off
+directly in-process instead, which is what makes the two-step form worth using
+on a large site:
 
 ```bash
 kirby fire:up --no-media && kirby fire:thumbs
@@ -109,6 +115,13 @@ reports an advisory.
 'e9li.kirby-fire' => [
     // warm a different domain than kirby()->url()
     'domain' => '',
+    // requests in flight during a crawl
+    'concurrency' => 5,
+    // per-request timeout in seconds
+    'timeout' => 60,
+    // TLS certificates are verified by default; set to true for
+    // local dev certificates (or pass --insecure to fire:up)
+    'insecure' => false,
     'ignore' => [
         // page ids and language codes to skip
         'page'     => [],

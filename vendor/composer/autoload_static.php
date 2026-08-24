@@ -8,8 +8,6 @@ class ComposerStaticInitd4af5891c6b67b5aabec8058e2837ea7
 {
     public static $files = array (
         '6e3fae29631ef280660b3cdad06f25a8' => __DIR__ . '/..' . '/symfony/deprecation-contracts/function.php',
-        '320cde22f66dd4f5d3fd621d3e88b98f' => __DIR__ . '/..' . '/symfony/polyfill-ctype/bootstrap.php',
-        '0e6d7bf4a5811bfa5cf40c5ccd6fae6a' => __DIR__ . '/..' . '/symfony/polyfill-mbstring/bootstrap.php',
         '662a729f963d39afe703c9d9b7ab4a8c' => __DIR__ . '/..' . '/symfony/polyfill-php83/bootstrap.php',
     );
 
@@ -17,22 +15,14 @@ class ComposerStaticInitd4af5891c6b67b5aabec8058e2837ea7
         'S' =>
         array (
             'Symfony\\Polyfill\\Php83\\' => 23,
-            'Symfony\\Polyfill\\Mbstring\\' => 26,
-            'Symfony\\Polyfill\\Ctype\\' => 23,
             'Symfony\\Contracts\\Service\\' => 26,
             'Symfony\\Contracts\\HttpClient\\' => 29,
             'Symfony\\Component\\HttpClient\\' => 29,
-            'Symfony\\Component\\DomCrawler\\' => 29,
-            'Symfony\\Component\\BrowserKit\\' => 29,
         ),
         'P' =>
         array (
             'Psr\\Log\\' => 8,
             'Psr\\Container\\' => 14,
-        ),
-        'M' =>
-        array (
-            'Masterminds\\' => 12,
         ),
         'K' =>
         array (
@@ -44,14 +34,6 @@ class ComposerStaticInitd4af5891c6b67b5aabec8058e2837ea7
         'Symfony\\Polyfill\\Php83\\' =>
         array (
             0 => __DIR__ . '/..' . '/symfony/polyfill-php83',
-        ),
-        'Symfony\\Polyfill\\Mbstring\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/symfony/polyfill-mbstring',
-        ),
-        'Symfony\\Polyfill\\Ctype\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/symfony/polyfill-ctype',
         ),
         'Symfony\\Contracts\\Service\\' =>
         array (
@@ -65,14 +47,6 @@ class ComposerStaticInitd4af5891c6b67b5aabec8058e2837ea7
         array (
             0 => __DIR__ . '/..' . '/symfony/http-client',
         ),
-        'Symfony\\Component\\DomCrawler\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/symfony/dom-crawler',
-        ),
-        'Symfony\\Component\\BrowserKit\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/symfony/browser-kit',
-        ),
         'Psr\\Log\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/log/src',
@@ -80,10 +54,6 @@ class ComposerStaticInitd4af5891c6b67b5aabec8058e2837ea7
         'Psr\\Container\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/container/src',
-        ),
-        'Masterminds\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/masterminds/html5/src',
         ),
         'Kirby\\' =>
         array (
@@ -106,25 +76,6 @@ class ComposerStaticInitd4af5891c6b67b5aabec8058e2837ea7
         'Kirby\\ComposerInstaller\\Installer' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/Installer.php',
         'Kirby\\ComposerInstaller\\Plugin' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/Plugin.php',
         'Kirby\\ComposerInstaller\\PluginInstaller' => __DIR__ . '/..' . '/getkirby/composer-installer/src/ComposerInstaller/PluginInstaller.php',
-        'Masterminds\\HTML5' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5.php',
-        'Masterminds\\HTML5\\Elements' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Elements.php',
-        'Masterminds\\HTML5\\Entities' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Entities.php',
-        'Masterminds\\HTML5\\Exception' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Exception.php',
-        'Masterminds\\HTML5\\InstructionProcessor' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/InstructionProcessor.php',
-        'Masterminds\\HTML5\\Parser\\CharacterReference' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/CharacterReference.php',
-        'Masterminds\\HTML5\\Parser\\DOMTreeBuilder' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/DOMTreeBuilder.php',
-        'Masterminds\\HTML5\\Parser\\EventHandler' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/EventHandler.php',
-        'Masterminds\\HTML5\\Parser\\FileInputStream' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/FileInputStream.php',
-        'Masterminds\\HTML5\\Parser\\InputStream' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/InputStream.php',
-        'Masterminds\\HTML5\\Parser\\ParseError' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/ParseError.php',
-        'Masterminds\\HTML5\\Parser\\Scanner' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/Scanner.php',
-        'Masterminds\\HTML5\\Parser\\StringInputStream' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/StringInputStream.php',
-        'Masterminds\\HTML5\\Parser\\Tokenizer' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/Tokenizer.php',
-        'Masterminds\\HTML5\\Parser\\TreeBuildingRules' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/TreeBuildingRules.php',
-        'Masterminds\\HTML5\\Parser\\UTF8Utils' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Parser/UTF8Utils.php',
-        'Masterminds\\HTML5\\Serializer\\OutputRules' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Serializer/OutputRules.php',
-        'Masterminds\\HTML5\\Serializer\\RulesInterface' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Serializer/RulesInterface.php',
-        'Masterminds\\HTML5\\Serializer\\Traverser' => __DIR__ . '/..' . '/masterminds/html5/src/HTML5/Serializer/Traverser.php',
         'Override' => __DIR__ . '/..' . '/symfony/polyfill-php83/Resources/stubs/Override.php',
         'Psr\\Container\\ContainerExceptionInterface' => __DIR__ . '/..' . '/psr/container/src/ContainerExceptionInterface.php',
         'Psr\\Container\\ContainerInterface' => __DIR__ . '/..' . '/psr/container/src/ContainerInterface.php',
@@ -138,43 +89,6 @@ class ComposerStaticInitd4af5891c6b67b5aabec8058e2837ea7
         'Psr\\Log\\LoggerTrait' => __DIR__ . '/..' . '/psr/log/src/LoggerTrait.php',
         'Psr\\Log\\NullLogger' => __DIR__ . '/..' . '/psr/log/src/NullLogger.php',
         'SQLite3Exception' => __DIR__ . '/..' . '/symfony/polyfill-php83/Resources/stubs/SQLite3Exception.php',
-        'Symfony\\Component\\BrowserKit\\AbstractBrowser' => __DIR__ . '/..' . '/symfony/browser-kit/AbstractBrowser.php',
-        'Symfony\\Component\\BrowserKit\\Cookie' => __DIR__ . '/..' . '/symfony/browser-kit/Cookie.php',
-        'Symfony\\Component\\BrowserKit\\CookieJar' => __DIR__ . '/..' . '/symfony/browser-kit/CookieJar.php',
-        'Symfony\\Component\\BrowserKit\\Exception\\BadMethodCallException' => __DIR__ . '/..' . '/symfony/browser-kit/Exception/BadMethodCallException.php',
-        'Symfony\\Component\\BrowserKit\\Exception\\ExceptionInterface' => __DIR__ . '/..' . '/symfony/browser-kit/Exception/ExceptionInterface.php',
-        'Symfony\\Component\\BrowserKit\\Exception\\InvalidArgumentException' => __DIR__ . '/..' . '/symfony/browser-kit/Exception/InvalidArgumentException.php',
-        'Symfony\\Component\\BrowserKit\\Exception\\JsonException' => __DIR__ . '/..' . '/symfony/browser-kit/Exception/JsonException.php',
-        'Symfony\\Component\\BrowserKit\\Exception\\LogicException' => __DIR__ . '/..' . '/symfony/browser-kit/Exception/LogicException.php',
-        'Symfony\\Component\\BrowserKit\\Exception\\RuntimeException' => __DIR__ . '/..' . '/symfony/browser-kit/Exception/RuntimeException.php',
-        'Symfony\\Component\\BrowserKit\\Exception\\UnexpectedValueException' => __DIR__ . '/..' . '/symfony/browser-kit/Exception/UnexpectedValueException.php',
-        'Symfony\\Component\\BrowserKit\\History' => __DIR__ . '/..' . '/symfony/browser-kit/History.php',
-        'Symfony\\Component\\BrowserKit\\HttpBrowser' => __DIR__ . '/..' . '/symfony/browser-kit/HttpBrowser.php',
-        'Symfony\\Component\\BrowserKit\\Request' => __DIR__ . '/..' . '/symfony/browser-kit/Request.php',
-        'Symfony\\Component\\BrowserKit\\Response' => __DIR__ . '/..' . '/symfony/browser-kit/Response.php',
-        'Symfony\\Component\\BrowserKit\\Test\\Constraint\\BrowserCookieValueSame' => __DIR__ . '/..' . '/symfony/browser-kit/Test/Constraint/BrowserCookieValueSame.php',
-        'Symfony\\Component\\BrowserKit\\Test\\Constraint\\BrowserHasCookie' => __DIR__ . '/..' . '/symfony/browser-kit/Test/Constraint/BrowserHasCookie.php',
-        'Symfony\\Component\\BrowserKit\\Test\\Constraint\\BrowserHistoryIsOnFirstPage' => __DIR__ . '/..' . '/symfony/browser-kit/Test/Constraint/BrowserHistoryIsOnFirstPage.php',
-        'Symfony\\Component\\BrowserKit\\Test\\Constraint\\BrowserHistoryIsOnLastPage' => __DIR__ . '/..' . '/symfony/browser-kit/Test/Constraint/BrowserHistoryIsOnLastPage.php',
-        'Symfony\\Component\\DomCrawler\\AbstractUriElement' => __DIR__ . '/..' . '/symfony/dom-crawler/AbstractUriElement.php',
-        'Symfony\\Component\\DomCrawler\\Crawler' => __DIR__ . '/..' . '/symfony/dom-crawler/Crawler.php',
-        'Symfony\\Component\\DomCrawler\\Field\\ChoiceFormField' => __DIR__ . '/..' . '/symfony/dom-crawler/Field/ChoiceFormField.php',
-        'Symfony\\Component\\DomCrawler\\Field\\FileFormField' => __DIR__ . '/..' . '/symfony/dom-crawler/Field/FileFormField.php',
-        'Symfony\\Component\\DomCrawler\\Field\\FormField' => __DIR__ . '/..' . '/symfony/dom-crawler/Field/FormField.php',
-        'Symfony\\Component\\DomCrawler\\Field\\InputFormField' => __DIR__ . '/..' . '/symfony/dom-crawler/Field/InputFormField.php',
-        'Symfony\\Component\\DomCrawler\\Field\\TextareaFormField' => __DIR__ . '/..' . '/symfony/dom-crawler/Field/TextareaFormField.php',
-        'Symfony\\Component\\DomCrawler\\Form' => __DIR__ . '/..' . '/symfony/dom-crawler/Form.php',
-        'Symfony\\Component\\DomCrawler\\FormFieldRegistry' => __DIR__ . '/..' . '/symfony/dom-crawler/FormFieldRegistry.php',
-        'Symfony\\Component\\DomCrawler\\Image' => __DIR__ . '/..' . '/symfony/dom-crawler/Image.php',
-        'Symfony\\Component\\DomCrawler\\Link' => __DIR__ . '/..' . '/symfony/dom-crawler/Link.php',
-        'Symfony\\Component\\DomCrawler\\Test\\Constraint\\CrawlerAnySelectorTextContains' => __DIR__ . '/..' . '/symfony/dom-crawler/Test/Constraint/CrawlerAnySelectorTextContains.php',
-        'Symfony\\Component\\DomCrawler\\Test\\Constraint\\CrawlerAnySelectorTextSame' => __DIR__ . '/..' . '/symfony/dom-crawler/Test/Constraint/CrawlerAnySelectorTextSame.php',
-        'Symfony\\Component\\DomCrawler\\Test\\Constraint\\CrawlerSelectorAttributeValueSame' => __DIR__ . '/..' . '/symfony/dom-crawler/Test/Constraint/CrawlerSelectorAttributeValueSame.php',
-        'Symfony\\Component\\DomCrawler\\Test\\Constraint\\CrawlerSelectorCount' => __DIR__ . '/..' . '/symfony/dom-crawler/Test/Constraint/CrawlerSelectorCount.php',
-        'Symfony\\Component\\DomCrawler\\Test\\Constraint\\CrawlerSelectorExists' => __DIR__ . '/..' . '/symfony/dom-crawler/Test/Constraint/CrawlerSelectorExists.php',
-        'Symfony\\Component\\DomCrawler\\Test\\Constraint\\CrawlerSelectorTextContains' => __DIR__ . '/..' . '/symfony/dom-crawler/Test/Constraint/CrawlerSelectorTextContains.php',
-        'Symfony\\Component\\DomCrawler\\Test\\Constraint\\CrawlerSelectorTextSame' => __DIR__ . '/..' . '/symfony/dom-crawler/Test/Constraint/CrawlerSelectorTextSame.php',
-        'Symfony\\Component\\DomCrawler\\UriResolver' => __DIR__ . '/..' . '/symfony/dom-crawler/UriResolver.php',
         'Symfony\\Component\\HttpClient\\AmpHttpClient' => __DIR__ . '/..' . '/symfony/http-client/AmpHttpClient.php',
         'Symfony\\Component\\HttpClient\\AsyncDecoratorTrait' => __DIR__ . '/..' . '/symfony/http-client/AsyncDecoratorTrait.php',
         'Symfony\\Component\\HttpClient\\CachingHttpClient' => __DIR__ . '/..' . '/symfony/http-client/CachingHttpClient.php',
@@ -273,8 +187,6 @@ class ComposerStaticInitd4af5891c6b67b5aabec8058e2837ea7
         'Symfony\\Contracts\\Service\\ServiceProviderInterface' => __DIR__ . '/..' . '/symfony/service-contracts/ServiceProviderInterface.php',
         'Symfony\\Contracts\\Service\\ServiceSubscriberInterface' => __DIR__ . '/..' . '/symfony/service-contracts/ServiceSubscriberInterface.php',
         'Symfony\\Contracts\\Service\\ServiceSubscriberTrait' => __DIR__ . '/..' . '/symfony/service-contracts/ServiceSubscriberTrait.php',
-        'Symfony\\Polyfill\\Ctype\\Ctype' => __DIR__ . '/..' . '/symfony/polyfill-ctype/Ctype.php',
-        'Symfony\\Polyfill\\Mbstring\\Mbstring' => __DIR__ . '/..' . '/symfony/polyfill-mbstring/Mbstring.php',
         'Symfony\\Polyfill\\Php83\\Php83' => __DIR__ . '/..' . '/symfony/polyfill-php83/Php83.php',
     );
 

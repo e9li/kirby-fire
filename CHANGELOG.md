@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.0
+
+HTTP engine rework — the crawl is built for sites with many pages and images.
+
+- Concurrent crawling: `fire:up` keeps up to `--concurrency` requests in
+  flight (default 5, also available as an option). The dev site's cold crawl
+  dropped from a few seconds to ~0.15 s; real sites can expect a speedup
+  roughly matching the concurrency level.
+- Thumbs are warmed without downloading them: media requests are cancelled
+  as soon as the status line arrives — Kirby generates the thumbnail before
+  the first body byte, so image bodies never cross the wire. On image-heavy
+  sites this cuts crawl traffic from potentially gigabytes to kilobytes.
+- Transport errors are retried once before a URL is reported as failed.
+- TLS certificates are verified now (behavior change — verification used to
+  be off). For local dev certificates set the `insecure` option or pass
+  `--insecure`.
+- New options: `concurrency` (5), `timeout` (60 seconds), `insecure`
+  (false).
+- `symfony/browser-kit` is no longer a dependency: the plugin talks to
+  Symfony HttpClient directly. Dropping it (and its dom-crawler/html5
+  parser) shrinks the shipped vendor folder, and HTML responses are no
+  longer parsed into a DOM nothing ever used.
+- Engine unit tests with Symfony's MockHttpClient: retry behavior, the
+  bounded request window, header-only mode, and HTTP error responses
+  surviving the stream generator's forced status check (a 404 from the
+  error page aborted the whole crawl in an early version of the engine).
+
 ## 0.2.3
 
 - Panel translations in en, de, de-ch, fr, it, ru and sr — every Panel

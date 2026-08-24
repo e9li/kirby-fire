@@ -4,23 +4,23 @@
 
 use Kirby\Cms\App;
 use Kirby\Cms\Media;
-use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Shared browser: follows redirects so redirected pages warm their target,
- * and disables peer/host verification for local dev certificates.
+ * Shared HTTP client. Follows redirects (client default) so redirected pages
+ * warm their target, verifies TLS unless the insecure option (or --insecure)
+ * says otherwise, and applies the configured timeout per request.
  */
-function fireBrowser(): HttpBrowser
+function fireClient(?bool $insecure = null): HttpClientInterface
 {
-    $browser = new HttpBrowser(HttpClient::create([
-        'verify_peer' => false,
-        'verify_host' => false,
-        'timeout' => 60,
-    ]));
-    $browser->followRedirects(true);
+    $insecure ??= kirby()->option('e9li.kirby-fire.insecure') === true;
 
-    return $browser;
+    return HttpClient::create([
+        'timeout' => (float)kirby()->option('e9li.kirby-fire.timeout', 60),
+        'verify_peer' => $insecure === false,
+        'verify_host' => $insecure === false,
+    ]);
 }
 
 /**
@@ -173,30 +173,153 @@ function fireMediaUrls(string $html): array
  * Requests one URL and reports the outcome. Media URLs of HTML responses
  * are returned for every response — also a 404, whose body is the rendered
  * error page and may be image-rich. Callers only warm the media of pages
- * they count as successful.
+ * they count as successful. Transport errors are retried once.
  */
-function fireWarm(HttpBrowser $browser, string $url): array
+function fireWarm(HttpClientInterface $client, string $url): array
 {
-    try {
-        $browser->request('GET', $url);
-        $response = $browser->getResponse();
-        $status = $response->getStatusCode();
-        $content = (string)$response->getContent();
-    } catch (Throwable $e) {
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            $response = $client->request('GET', $url);
+            $status = $response->getStatusCode();
+            // no throwing on 4xx/5xx — a 404 body is the rendered error page
+            $content = $response->getContent(false);
+            $type = $response->getHeaders(false)['content-type'][0] ?? '';
+        } catch (Throwable $e) {
+            if ($attempt === 1) {
+                continue;
+            }
+
+            return [
+                'status' => 0,
+                'error' => $e->getMessage(),
+                'media' => [],
+            ];
+        }
+
         return [
-            'status' => 0,
-            'error' => $e->getMessage(),
-            'media' => [],
+            'status' => $status,
+            'error' => null,
+            'media' => str_contains($type, 'text/html') ? fireMediaUrls($content) : [],
         ];
     }
+}
 
-    $isHtml = str_contains($response->getHeader('Content-Type') ?? '', 'text/html');
+/**
+ * Warms many URLs with up to $concurrency requests in flight. With $bodies
+ * the responses are downloaded and same-site media URLs extracted (pages);
+ * without, every request is cancelled once the status line arrives (media —
+ * the thumb is generated before the first body byte, so downloading it would
+ * only burn bandwidth). Transport errors are retried once. $onResult runs
+ * per finished URL, in completion order.
+ */
+function fireWarmAll(
+    HttpClientInterface $client,
+    array $urls,
+    int $concurrency,
+    bool $bodies,
+    ?callable $onResult = null
+): array {
+    $queue = array_values($urls);
+    $inFlight = [];
+    $results = [];
 
-    return [
-        'status' => $status,
-        'error' => null,
-        'media' => $isHtml ? fireMediaUrls($content) : [],
-    ];
+    $request = function (string $url, int $attempt) use ($client, $bodies, &$inFlight): void {
+        $response = $client->request('GET', $url, ['buffer' => $bodies]);
+        $inFlight[spl_object_id($response)] = [
+            'url' => $url,
+            'attempt' => $attempt,
+            'response' => $response,
+        ];
+    };
+
+    $finish = function (array $meta, array $result) use (&$inFlight, &$results, $onResult): void {
+        unset($inFlight[spl_object_id($meta['response'])]);
+        $results[$meta['url']] = $result;
+
+        if ($onResult !== null) {
+            $onResult($meta['url'], $result);
+        }
+    };
+
+    while ($queue !== [] || $inFlight !== []) {
+        while (count($inFlight) < $concurrency && $queue !== []) {
+            $request(array_shift($queue), 1);
+        }
+
+        // stream the window; every completion breaks out to refill it
+        try {
+            foreach ($client->stream(array_column($inFlight, 'response')) as $response => $chunk) {
+                $meta = $inFlight[spl_object_id($response)];
+
+                try {
+                    if ($chunk->isFirst() === true) {
+                        // always consume the status here: after yielding the
+                        // first chunk, the stream generator force-checks
+                        // unconsumed responses with getHeaders(true), which
+                        // throws for every 4xx — including the error page's
+                        // 404, which is a valid result for this crawler
+                        $status = $response->getStatusCode();
+
+                        if ($bodies === false) {
+                            $response->cancel();
+                            $finish($meta, ['status' => $status, 'error' => null, 'media' => []]);
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    if ($chunk->isLast() === true) {
+                        $status = $response->getStatusCode();
+                        $type = $response->getHeaders(false)['content-type'][0] ?? '';
+                        $content = $bodies ? $response->getContent(false) : '';
+
+                        $finish($meta, [
+                            'status' => $status,
+                            'error' => null,
+                            'media' => $bodies === true && str_contains($type, 'text/html')
+                                ? fireMediaUrls($content)
+                                : [],
+                        ]);
+                        break;
+                    }
+                } catch (Throwable $e) {
+                    unset($inFlight[spl_object_id($response)]);
+
+                    if ($meta['attempt'] === 1) {
+                        $request($meta['url'], 2);
+                    } else {
+                        $results[$meta['url']] = ['status' => 0, 'error' => $e->getMessage(), 'media' => []];
+
+                        if ($onResult !== null) {
+                            $onResult($meta['url'], $results[$meta['url']]);
+                        }
+                    }
+
+                    break;
+                }
+            }
+        } catch (Throwable $e) {
+            // thrown by the stream generator itself, outside a chunk — the
+            // failing response is unknown, so retry or fail the whole window
+            $window = $inFlight;
+            $inFlight = [];
+
+            foreach ($window as $meta) {
+                if ($meta['attempt'] === 1) {
+                    $request($meta['url'], 2);
+                } else {
+                    $results[$meta['url']] = ['status' => 0, 'error' => $e->getMessage(), 'media' => []];
+
+                    if ($onResult !== null) {
+                        $onResult($meta['url'], $results[$meta['url']]);
+                    }
+                }
+            }
+        }
+    }
+
+    return $results;
 }
 
 /**
@@ -331,6 +454,11 @@ App::plugin('e9li/kirby-fire', [
             'page' => [],
             'language' => [],
         ],
+        // TLS verification is on by default; set to true for local dev
+        // certificates (or pass --insecure to fire:up)
+        'insecure' => false,
+        'timeout' => 60,
+        'concurrency' => 5,
     ],
     'translations' => [
         'en' => require __DIR__ . '/translations/en.php',
@@ -353,6 +481,16 @@ App::plugin('e9li/kirby-fire', [
                     // domain is positional, so this has to be a flag or it would
                     // swallow the domain argument
                     'longPrefix' => 'no-media',
+                    'noValue' => true,
+                ],
+                'concurrency' => [
+                    'description' => 'Requests in flight at once (default 5)',
+                    'longPrefix' => 'concurrency',
+                    'castTo' => 'int',
+                ],
+                'insecure' => [
+                    'description' => 'Skip TLS certificate verification (local dev certificates)',
+                    'longPrefix' => 'insecure',
                     'noValue' => true,
                 ],
             ],
@@ -386,13 +524,15 @@ App::plugin('e9li/kirby-fire', [
                     exit(1);
                 }
 
-                $browser = fireBrowser();
+                $concurrency = max(1, (int)($cli->arg('concurrency')
+                    ?: kirby()->option('e9li.kirby-fire.concurrency', 5)));
+                $client = fireClient($cli->arg('insecure') === true ? true : null);
 
-                $pagesOn = 0;
-                $mediaOn = 0;
-                $failed = 0;
+                // resolve every target URL first — the crawl runs with
+                // $concurrency requests in flight, so results arrive in
+                // completion order and need their per-URL context up front
+                $targets = [];
                 $skipped = 0;
-                $i = 1;
 
                 foreach (firePageUrls() as $item) {
                     $url = $item['url'];
@@ -406,33 +546,58 @@ App::plugin('e9li/kirby-fire', [
                         }
                     }
 
-                    $result = fireWarm($browser, $url);
+                    $targets[$url] = $item['isErrorPage'];
+                }
 
-                    // the error page renders (and caches) with HTTP 404 by
-                    // design — that is a warmed page, not a failure
-                    $expected404 = $item['isErrorPage'] === true && $result['status'] === 404;
+                $pagesOn = 0;
+                $mediaOn = 0;
+                $failed = 0;
+                $i = 1;
+                $mediaQueue = [];
 
-                    if ($result['status'] === 0 || ($result['status'] >= 400 && $expected404 === false)) {
-                        $cli->error($i . ': ' . $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
-                        $failed++;
-                        $i++;
-                        continue;
-                    }
+                fireWarmAll(
+                    $client,
+                    array_keys($targets),
+                    $concurrency,
+                    true,
+                    function (string $url, array $result) use ($cli, $targets, &$pagesOn, &$failed, &$i, &$mediaQueue): void {
+                        // the error page renders (and caches) with HTTP 404 by
+                        // design — that is a warmed page, not a failure
+                        $expected404 = $targets[$url] === true && $result['status'] === 404;
 
-                    $cli->out($i . ': fire up ' . $url . ($expected404 ? ' (error page, 404 expected)' : ''));
-                    $pagesOn++;
-                    $i++;
-
-                    foreach ($skipMedia ? [] : $result['media'] as $mediaUrl) {
-                        $mediaResult = fireWarm($browser, $mediaUrl);
-
-                        if ($mediaResult['status'] >= 400 || $mediaResult['status'] === 0) {
-                            $cli->error('   media: ' . $mediaUrl . ' → ' . ($mediaResult['error'] ?? 'HTTP ' . $mediaResult['status']));
+                        if ($result['status'] === 0 || ($result['status'] >= 400 && $expected404 === false)) {
+                            $cli->error($i . ': ' . $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
                             $failed++;
                         } else {
-                            $mediaOn++;
+                            $cli->out($i . ': fire up ' . $url . ($expected404 ? ' (error page, 404 expected)' : ''));
+                            $pagesOn++;
+
+                            foreach ($result['media'] as $mediaUrl) {
+                                $mediaQueue[$mediaUrl] = true;
+                            }
                         }
+
+                        $i++;
                     }
+                );
+
+                if ($skipMedia === false && $mediaQueue !== []) {
+                    // status-only requests: the thumb is generated server-side
+                    // before the first body byte, so no image is downloaded
+                    fireWarmAll(
+                        $client,
+                        array_keys($mediaQueue),
+                        $concurrency,
+                        false,
+                        function (string $url, array $result) use ($cli, &$mediaOn, &$failed): void {
+                            if ($result['status'] === 0 || $result['status'] >= 400) {
+                                $cli->error('   media: ' . $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
+                                $failed++;
+                            } else {
+                                $mediaOn++;
+                            }
+                        }
+                    );
                 }
 
                 $cli->br();
@@ -563,7 +728,7 @@ App::plugin('e9li/kirby-fire', [
                         ];
                     }
 
-                    $result = fireWarm(fireBrowser(), $url);
+                    $result = fireWarm(fireClient(), $url);
 
                     // the error page renders (and caches) with HTTP 404 by
                     // design — that is a warmed page, not a failure
