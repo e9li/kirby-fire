@@ -1,0 +1,23 @@
+<?php
+
+return [
+    'e9li.kirby-fire.title' => 'Fire',
+    'e9li.kirby-fire.headline' => 'Разожгите ваш кэш!',
+    'e9li.kirby-fire.button.fireup' => 'Разжечь',
+    'e9li.kirby-fire.button.continue' => 'Продолжить',
+    'e9li.kirby-fire.button.extinguish' => 'Потушить',
+    'e9li.kirby-fire.button.stop' => 'Стоп',
+    'e9li.kirby-fire.button.clear' => 'Очистить кэш',
+    'e9li.kirby-fire.empty' => 'Нет страниц в огне',
+    'e9li.kirby-fire.column.url' => 'URL',
+    'e9li.kirby-fire.column.state' => 'Статус',
+    'e9li.kirby-fire.state.no-fire' => 'нет огня',
+    'e9li.kirby-fire.state.fire-up' => 'разжигается',
+    'e9li.kirby-fire.state.fire-on' => 'горит',
+    'e9li.kirby-fire.state.extinguished' => 'потушено',
+    'e9li.kirby-fire.error.request' => 'Запрос не выполнен',
+    'e9li.kirby-fire.notification.done' => 'Кэш горит!',
+    'e9li.kirby-fire.status.active' => 'Кэш страниц: активен',
+    'e9li.kirby-fire.status.count' => '{count} страниц в кэше',
+    'e9li.kirby-fire.status.inactive' => 'Кэш страниц не активен — ничего не будет кэшироваться.',
+];

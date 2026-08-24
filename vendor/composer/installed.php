@@ -1,8 +1,8 @@
 <?php return array(
     'root' => array(
         'name' => 'e9li/kirby-fire',
-        'pretty_version' => '0.2.1',
-        'version' => '0.2.1.0',
+        'pretty_version' => '0.2.3',
+        'version' => '0.2.3.0',
         'reference' => null,
         'type' => 'kirby-plugin',
         'install_path' => __DIR__ . '/../../',
@@ -11,8 +11,8 @@
     ),
     'versions' => array(
         'e9li/kirby-fire' => array(
-            'pretty_version' => '0.2.1',
-            'version' => '0.2.1.0',
+            'pretty_version' => '0.2.3',
+            'version' => '0.2.3.0',
             'reference' => null,
             'type' => 'kirby-plugin',
             'install_path' => __DIR__ . '/../../',

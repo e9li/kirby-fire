@@ -1,0 +1,23 @@
+<?php
+
+return [
+    'e9li.kirby-fire.title' => 'Fire',
+    'e9li.kirby-fire.headline' => 'Accendi la tua cache!',
+    'e9li.kirby-fire.button.fireup' => 'Accendi',
+    'e9li.kirby-fire.button.continue' => 'Continua',
+    'e9li.kirby-fire.button.extinguish' => 'Spegni',
+    'e9li.kirby-fire.button.stop' => 'Stop',
+    'e9li.kirby-fire.button.clear' => 'Svuota la cache',
+    'e9li.kirby-fire.empty' => 'Nessuna pagina in fiamme',
+    'e9li.kirby-fire.column.url' => 'URL',
+    'e9li.kirby-fire.column.state' => 'Stato',
+    'e9li.kirby-fire.state.no-fire' => 'nessun fuoco',
+    'e9li.kirby-fire.state.fire-up' => 'si accende',
+    'e9li.kirby-fire.state.fire-on' => 'acceso',
+    'e9li.kirby-fire.state.extinguished' => 'spento',
+    'e9li.kirby-fire.error.request' => 'Richiesta non riuscita',
+    'e9li.kirby-fire.notification.done' => 'La cache è accesa!',
+    'e9li.kirby-fire.status.active' => 'Cache delle pagine: attiva',
+    'e9li.kirby-fire.status.count' => '{count} pagine in cache',
+    'e9li.kirby-fire.status.inactive' => 'La cache delle pagine non è attiva — non verrà salvato nulla in cache.',
+];

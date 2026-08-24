@@ -1,26 +1,30 @@
 <template>
     <k-panel-inside>
         <k-header data-has-buttons="true">
-            <k-header-title>Fire up your cache!</k-header-title>
+            <k-header-title>{{ $t("e9li.kirby-fire.headline") }}</k-header-title>
             <k-header-buttons slot="buttons">
                 <k-button-group>
-                    <k-button v-if="!isHeatingUp && index === 0" variant="filled" icon="fire" theme="positive" @click="start()">Fire up</k-button>
-                    <k-button v-if="!isHeatingUp && index !== 0" variant="filled" icon="fire" theme="positive" @click="start()">Continue</k-button>
-                    <k-button v-if="!isHeatingUp && index !== 0" variant="filled" icon="cancel" theme="negative" @click="reset()">Extinguish</k-button>
-                    <k-button v-if="isHeatingUp" variant="filled" icon="cancel" theme="negative" @click="pause()">Stop</k-button>
-                    <k-button v-if="!isHeatingUp" variant="filled" icon="trash" @click="clearCache()">Clear cache</k-button>
+                    <k-button v-if="!isHeatingUp && index === 0" variant="filled" icon="fire" theme="positive" @click="start()">{{ $t("e9li.kirby-fire.button.fireup") }}</k-button>
+                    <k-button v-if="!isHeatingUp && index !== 0" variant="filled" icon="fire" theme="positive" @click="start()">{{ $t("e9li.kirby-fire.button.continue") }}</k-button>
+                    <k-button v-if="!isHeatingUp && index !== 0" variant="filled" icon="cancel" theme="negative" @click="reset()">{{ $t("e9li.kirby-fire.button.extinguish") }}</k-button>
+                    <k-button v-if="isHeatingUp" variant="filled" icon="cancel" theme="negative" @click="pause()">{{ $t("e9li.kirby-fire.button.stop") }}</k-button>
+                    <k-button v-if="!isHeatingUp" variant="filled" icon="trash" @click="clearCache()">{{ $t("e9li.kirby-fire.button.clear") }}</k-button>
                 </k-button-group>
             </k-header-buttons>
         </k-header>
+        <k-box v-if="status.active === false" theme="negative" :text="$t('e9li.kirby-fire.status.inactive')"/>
+        <p v-if="status.active === true" class="k-fire-status">
+            {{ $t("e9li.kirby-fire.status.active") }}<template v-if="status.count !== null"> — {{ $t("e9li.kirby-fire.status.count", { count: status.count }) }}</template>
+        </p>
         <k-grid style="--columns: 1; gap: var(--spacing-8)">
-            <k-empty v-if="items.length === 0" icon="blaze" text="No pages on fire"/>
+            <k-empty v-if="items.length === 0" icon="blaze" :text="$t('e9li.kirby-fire.empty')"/>
             <div v-if="items.length > 0" class="k-table">
                 <table>
                     <thead>
                     <tr>
                         <th class="k-table-index-column">#</th>
-                        <th class="k-boiler-url" data-mobile="true">URL</th>
-                        <th class="k-state-column" data-mobile="true">State</th>
+                        <th class="k-boiler-url" data-mobile="true">{{ $t("e9li.kirby-fire.column.url") }}</th>
+                        <th class="k-state-column" data-mobile="true">{{ $t("e9li.kirby-fire.column.state") }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -62,6 +66,10 @@ export default {
             index: 0,
             items: [],
             known: new Set(),
+            status: {
+                active: null,
+                count: null,
+            },
         }
     },
     created() {
@@ -69,12 +77,20 @@ export default {
     },
     methods: {
         stateText(state) {
-            return state.replace(/-/g, " ");
+            return this.$t("e9li.kirby-fire.state." + state);
         },
         load() {
             this.$api.get("fire/pages").then((data) => {
                 this.items = data;
                 this.known = new Set(data.map((item) => item.url));
+            });
+            this.loadStatus();
+        },
+        loadStatus() {
+            // the list's "no fire" states are client-side only — this shows
+            // the actual server-side cache state next to them
+            this.$api.get("fire/status").then((data) => {
+                this.status = data;
             });
         },
         queueMedia(index, media) {
@@ -101,13 +117,14 @@ export default {
             if (index >= this.items.length) {
                 if (this.isHeatingUp) {
                     this.$panel.notification.success({
-                        message: "Cache is on!",
+                        message: this.$t("e9li.kirby-fire.notification.done"),
                         icon: "fire",
                     });
                 }
 
                 this.isHeatingUp = false;
                 this.index = 0;
+                this.loadStatus();
                 return;
             }
 
@@ -130,7 +147,7 @@ export default {
                     this.items.splice(index, 1, {
                         ...this.items[index],
                         state: "extinguished",
-                        error: "Request failed",
+                        error: this.$t("e9li.kirby-fire.error.request"),
                     });
                 })
                 .finally(() => {
@@ -161,6 +178,12 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+
+.k-fire-status {
+    margin-bottom: var(--spacing-4);
+    color: var(--color-text-dimmed);
+    font-size: var(--text-sm);
+}
 
 .k-table-index-column {
     width: 4.5rem;

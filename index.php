@@ -271,6 +271,40 @@ function fireJobs(): array
 }
 
 /**
+ * State of the pages cache: whether it is active, and — for the file driver,
+ * the only one whose entries can be listed — how many entries it holds.
+ * Shown in the Panel so "no fire" rows are never mistaken for an empty cache.
+ */
+function fireCacheStatus(): array
+{
+    $cache = kirby()->cache('pages');
+    $active = ($cache->options()['active'] ?? false) === true;
+    $count = null;
+
+    if ($active === true && $cache instanceof Kirby\Cache\FileCache) {
+        $count = 0;
+        $root = $cache->root();
+
+        if (is_dir($root) === true) {
+            $tree = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)
+            );
+
+            foreach ($tree as $file) {
+                if ($file->isFile() === true && $file->getExtension() === 'cache') {
+                    $count++;
+                }
+            }
+        }
+    }
+
+    return [
+        'active' => $active,
+        'count' => $count,
+    ];
+}
+
+/**
  * Generates one pending thumbnail. Media::thumb() reads the job, resolves the
  * source file, runs the darkroom and removes the job file — reimplementing it
  * here would mean duplicating its path-traversal guards and drifting from core.
@@ -297,6 +331,15 @@ App::plugin('e9li/kirby-fire', [
             'page' => [],
             'language' => [],
         ],
+    ],
+    'translations' => [
+        'en' => require __DIR__ . '/translations/en.php',
+        'de' => require __DIR__ . '/translations/de.php',
+        'de-ch' => require __DIR__ . '/translations/de-ch.php',
+        'fr' => require __DIR__ . '/translations/fr.php',
+        'it' => require __DIR__ . '/translations/it.php',
+        'ru' => require __DIR__ . '/translations/ru.php',
+        'sr' => require __DIR__ . '/translations/sr.php',
     ],
     'commands' => [
         'fire:up' => [
@@ -464,7 +507,7 @@ App::plugin('e9li/kirby-fire', [
     'areas' => [
         'fireView' => function (): array {
             return [
-                'label' => 'Fire',
+                'label' => t('e9li.kirby-fire.title', 'Fire'),
                 'icon' => 'fire',
                 'menu' => true,
                 'link' => 'fire',
@@ -474,7 +517,7 @@ App::plugin('e9li/kirby-fire', [
                         'action' => function () {
                             return [
                                 'component' => 'fireView',
-                                'title' => 'Fire',
+                                'title' => t('e9li.kirby-fire.title', 'Fire'),
                             ];
                         },
                     ],
@@ -541,6 +584,13 @@ App::plugin('e9li/kirby-fire', [
                         'state' => 'fire-on',
                         'media' => $result['media'],
                     ];
+                },
+            ],
+            [
+                'pattern' => 'fire/status',
+                'method' => 'GET',
+                'action' => function (): array {
+                    return fireCacheStatus();
                 },
             ],
             [

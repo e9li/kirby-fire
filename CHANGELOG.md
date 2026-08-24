@@ -1,8 +1,23 @@
 # Changelog
 
-## 0.2.1
+## 0.2.3
 
-Bugfix release.
+- Panel translations in en, de, de-ch, fr, it, ru and sr — every Panel
+  string goes through Kirby's translation system now, including the menu
+  label, buttons, states, the empty screen and the completion notification.
+- New cache status line in the Panel: shows whether the pages cache is
+  active and how many pages are currently cached (file cache driver). When
+  the pages cache is off, a warning box appears instead — previously only
+  the CLI warned about that, while the Panel happily showed green rows that
+  cached nothing. The row states are client-side only; this line shows the
+  actual server-side cache state (which normal visitor traffic fills too).
+- CI workflow (`.github/workflows/ci.yml`, GitHub Actions / Gitea Actions
+  compatible): `composer validate`, the PHPUnit suite on PHP 8.2–8.5 and a
+  weekly `composer audit` of the locked dependencies.
+
+## 0.2.2
+
+Bugfix release. (0.2.1 was never tagged; its changes shipped here.)
 
 - **Single-language sites warmed nothing.** `fire:up` and the panel iterated
   `kirby()->languages()`, which is empty without a `site/languages` folder, so
