@@ -34,6 +34,10 @@ Bugfix release.
 - Dependencies updated (Symfony 7.0.3 → 7.4.17), which resolves the low
   severity advisories CVE-2026-45071 (dom-crawler) and CVE-2024-50342
   (http-client) in the shipped vendor folder.
+- Symfony 8 is allowed (`^7.0 || ^8.0`) and PHP 8.5 added to the supported
+  versions: Composer installs on PHP 8.4+ resolve Symfony 8.x, while the
+  shipped vendor folder stays on 7.4 LTS — Symfony 8 requires PHP >= 8.4,
+  and the embedded copy has to run on every supported PHP version (8.2+).
 - New: `fire:up` warns when the pages cache is not active — previously it
   reported success while Kirby silently cached nothing.
 - New: the error page no longer shows up as a failure. It answers with
