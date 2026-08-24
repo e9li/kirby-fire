@@ -5,6 +5,14 @@ Icon
 .DS_Store
 
 
+# Tools
+# ------------
+
+/.playwright-mcp
+/.playwright-mcp/*
+/.phpunit.result.cache
+
+
 # Editors
 # ---------------
 *.sublime-project
