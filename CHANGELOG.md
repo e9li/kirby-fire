@@ -26,7 +26,9 @@ Bugfix release.
   flipped its running state back when it ran past the last row, so the
   header kept offering "Stop" although nothing was running (and "Continue"
   could wedge it again). Completion now returns to the idle buttons and
-  shows a "Cache is on 🔥" notification.
+  shows a "Cache is on!" notification with the plugin's flame icon.
+- All emojis removed from the CLI output and the Panel — iconography comes
+  from the plugin's registered SVG icons instead.
 - **PHP 8.1 was declared but never worked.** The shipped Symfony packages
   require PHP >= 8.2, so the constraint now says so. The composer platform is
   pinned to 8.2 so dependency resolution always targets the minimum supported

@@ -316,7 +316,7 @@ App::plugin('e9li/kirby-fire', [
             'command' => function ($cli): void {
 
                 $cli->br();
-                $cli->bold('🔥 fire up the cache...');
+                $cli->bold('Fire up the cache...');
 
                 // without an active pages cache every "warmed" page is
                 // rendered and thrown away — Kirby silently skips caching
@@ -402,7 +402,7 @@ App::plugin('e9li/kirby-fire', [
                     $cli->error(' ' . $failed . ' URL(s) failed — see above. ');
                 }
 
-                $cli->success(' Cache is on 🔥 (' . $pagesOn . ' pages, ' . $mediaOn . ' media files), site is ready! ');
+                $cli->success(' Cache is on (' . $pagesOn . ' pages, ' . $mediaOn . ' media files), site is ready! ');
 
                 if ($skipMedia === true) {
                     $cli->out('Thumbs were skipped — run "kirby fire:thumbs" to generate them.');
@@ -416,13 +416,13 @@ App::plugin('e9li/kirby-fire', [
             'command' => function ($cli): void {
 
                 $cli->br();
-                $cli->bold('🔥 render pending thumbs...');
+                $cli->bold('Render pending thumbs...');
 
                 $jobs = fireJobs();
 
                 if ($jobs === []) {
                     $cli->br();
-                    $cli->success(' Nothing to render — every thumb is already on 🔥 ');
+                    $cli->success(' Nothing to render — every thumb is already on. ');
                     $cli->out('If images are missing, the pages have to be rendered first: flush the');
                     $cli->out('page cache, then run "kirby fire:up --no-media && kirby fire:thumbs".');
                     $cli->br();
@@ -453,7 +453,7 @@ App::plugin('e9li/kirby-fire', [
                     $cli->error(' ' . $failed . ' thumb(s) failed — see above. ');
                 }
 
-                $cli->success(' ' . $rendered . ' thumb(s) rendered 🔥 ');
+                $cli->success(' ' . $rendered . ' thumb(s) rendered ');
                 $cli->br();
             },
         ],

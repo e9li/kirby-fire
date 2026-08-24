@@ -13,7 +13,7 @@
             </k-header-buttons>
         </k-header>
         <k-grid style="--columns: 1; gap: var(--spacing-8)">
-            <k-empty v-if="items.length === 0" icon="boiler" text="No pages on fire"/>
+            <k-empty v-if="items.length === 0" icon="blaze" text="No pages on fire"/>
             <div v-if="items.length > 0" class="k-table">
                 <table>
                     <thead>
@@ -100,7 +100,10 @@ export default {
             // buttons, otherwise "Stop" stays although nothing runs anymore
             if (index >= this.items.length) {
                 if (this.isHeatingUp) {
-                    this.$panel.notification.success("Cache is on 🔥");
+                    this.$panel.notification.success({
+                        message: "Cache is on!",
+                        icon: "fire",
+                    });
                 }
 
                 this.isHeatingUp = false;
