@@ -23,14 +23,13 @@ use Symfony\Contracts\HttpClient\ChunkInterface;
 class ErrorChunk implements ChunkInterface
 {
     private bool $didThrow = false;
-    private int $offset;
     private string $errorMessage;
     private ?\Throwable $error = null;
 
-    public function __construct(int $offset, \Throwable|string $error)
-    {
-        $this->offset = $offset;
-
+    public function __construct(
+        private int $offset,
+        \Throwable|string $error,
+    ) {
         if (\is_string($error)) {
             $this->errorMessage = $error;
         } else {
@@ -93,12 +92,12 @@ class ErrorChunk implements ChunkInterface
         return $this->didThrow;
     }
 
-    public function __sleep(): array
+    public function __serialize(): array
     {
         throw new \BadMethodCallException('Cannot serialize '.__CLASS__);
     }
 
-    public function __wakeup(): void
+    public function __unserialize(array $data): void
     {
         throw new \BadMethodCallException('Cannot unserialize '.__CLASS__);
     }
