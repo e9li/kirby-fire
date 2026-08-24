@@ -96,7 +96,19 @@ export default {
         heatUp(index) {
             this.index = index;
 
-            if (index >= this.items.length || this.isHeatingUp !== true) {
+            // past the last row: the crawl is complete — back to the idle
+            // buttons, otherwise "Stop" stays although nothing runs anymore
+            if (index >= this.items.length) {
+                if (this.isHeatingUp) {
+                    this.$panel.notification.success("Cache is on 🔥");
+                }
+
+                this.isHeatingUp = false;
+                this.index = 0;
+                return;
+            }
+
+            if (this.isHeatingUp !== true) {
                 return;
             }
 
@@ -104,16 +116,19 @@ export default {
 
             this.$api.post("fire/up", this.items[index])
                 .then((data) => {
-                    this.items[index] = data;
+                    // splice instead of items[index] = data — Vue 2 cannot
+                    // observe by-index array assignments, which left the last
+                    // row stuck on "fire up"
+                    this.items.splice(index, 1, data);
                     this.queueMedia(index, data.media);
                 })
                 .catch(() => {
                     // a failed request must not stall the crawl
-                    this.items[index] = {
+                    this.items.splice(index, 1, {
                         ...this.items[index],
                         state: "extinguished",
                         error: "Request failed",
-                    };
+                    });
                 })
                 .finally(() => {
                     setTimeout(() => {

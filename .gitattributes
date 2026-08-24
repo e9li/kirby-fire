@@ -1,0 +1,8 @@
+# Keep dev scaffolding out of dist archives (Composer dists, release ZIPs).
+# The committed vendor/ folder stays in — ZIP and submodule installs need it.
+
+/tests          export-ignore
+/phpunit.xml    export-ignore
+/.editorconfig  export-ignore
+/.gitattributes export-ignore
+/.gitignore     export-ignore

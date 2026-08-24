@@ -24,9 +24,10 @@ function fireBrowser(): HttpBrowser
 }
 
 /**
- * Base URLs the warmer is allowed to request: the site's own URL plus the
- * optional domain override. Guards the fire/up API route against being used
- * to fetch arbitrary third-party (or internal) URLs.
+ * Base URLs the warmer is allowed to request: the site's own URL, the
+ * optional domain override and every language's own domain. Guards the
+ * fire/up API route against being used to fetch arbitrary third-party
+ * (or internal) URLs.
  */
 function fireAllowedBases(): array
 {
@@ -36,13 +37,21 @@ function fireAllowedBases(): array
         $bases[] = rtrim($domain, '/') . '/';
     }
 
-    return $bases;
+    // languages may live on their own domains via their url option
+    foreach (kirby()->languages() as $language) {
+        $bases[] = rtrim($language->baseUrl(), '/') . '/';
+    }
+
+    return array_values(array_unique($bases));
 }
 
 function fireAllowedUrl(string $url): bool
 {
     foreach (fireAllowedBases() as $base) {
-        if (str_starts_with($url, $base)) {
+        // The home page URL is the base itself, without the trailing slash.
+        // Every other URL must match the slash-suffixed prefix, so that
+        // https://example.com never allows https://example.com.evil.com
+        if ($url === rtrim($base, '/') || str_starts_with($url, $base)) {
             return true;
         }
     }
@@ -57,13 +66,82 @@ function fireAllowedUrl(string $url): bool
  */
 function fireRewriteUrl(string $url, string $domain): ?string
 {
-    $siteBase = rtrim(kirby()->url(), '/') . '/';
+    $siteBase = rtrim(kirby()->url(), '/');
 
-    if (str_starts_with($url, $siteBase) === false) {
+    // the home page URL is the site base itself, without a trailing slash
+    if ($url === $siteBase) {
+        return rtrim($domain, '/');
+    }
+
+    if (str_starts_with($url, $siteBase . '/') === false) {
         return null;
     }
 
-    return rtrim($domain, '/') . '/' . substr($url, strlen($siteBase));
+    return rtrim($domain, '/') . substr($url, strlen($siteBase));
+}
+
+/**
+ * Every URL the warmer should visit — each page in each language, with the
+ * configured ignore rules applied. Shared by the fire:up command and the
+ * fire/pages API route. On single-language sites the language is null:
+ * kirby()->languages() is empty there, so iterating it directly would
+ * silently skip every page.
+ */
+function firePageUrls(): array
+{
+    $ignorePages = (array)kirby()->option('e9li.kirby-fire.ignore.page', []);
+    $ignoreLanguages = (array)kirby()->option('e9li.kirby-fire.ignore.language', []);
+
+    $languages = kirby()->languages();
+    $languages = $languages->count() > 0 ? $languages : [null];
+
+    $urls = [];
+
+    foreach (site()->pages()->index() as $page) {
+        if (in_array($page->id(), $ignorePages, true)) {
+            continue;
+        }
+
+        foreach ($languages as $language) {
+            $code = $language?->code();
+
+            if ($code !== null && in_array($code, $ignoreLanguages, true)) {
+                continue;
+            }
+
+            $urls[] = [
+                'url' => $page->url($code),
+                'language' => $code,
+                // the error page answers with HTTP 404 by design — callers
+                // must count that as warmed, not as a failure
+                'isErrorPage' => $page->isErrorPage(),
+            ];
+        }
+    }
+
+    return $urls;
+}
+
+/**
+ * Whether a URL is the error page in any language. Lets the fire/up API
+ * route apply the 404-is-expected rule without trusting a client flag.
+ */
+function fireIsErrorPageUrl(string $url): bool
+{
+    if (($error = site()->errorPage()) === null) {
+        return false;
+    }
+
+    $languages = kirby()->languages();
+    $languages = $languages->count() > 0 ? $languages : [null];
+
+    foreach ($languages as $language) {
+        if ($url === $error->url($language?->code())) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -93,7 +171,9 @@ function fireMediaUrls(string $html): array
 
 /**
  * Requests one URL and reports the outcome. Media URLs of HTML responses
- * are returned so callers can warm them as well.
+ * are returned for every response — also a 404, whose body is the rendered
+ * error page and may be image-rich. Callers only warm the media of pages
+ * they count as successful.
  */
 function fireWarm(HttpBrowser $browser, string $url): array
 {
@@ -115,7 +195,7 @@ function fireWarm(HttpBrowser $browser, string $url): array
     return [
         'status' => $status,
         'error' => null,
-        'media' => $status < 400 && $isHtml ? fireMediaUrls($content) : [],
+        'media' => $isHtml ? fireMediaUrls($content) : [],
     ];
 }
 
@@ -238,10 +318,23 @@ App::plugin('e9li/kirby-fire', [
                 $cli->br();
                 $cli->bold('🔥 fire up the cache...');
 
+                // without an active pages cache every "warmed" page is
+                // rendered and thrown away — Kirby silently skips caching
+                if ((kirby()->cache('pages')->options()['active'] ?? false) === false) {
+                    $cli->error(' The pages cache is not active — nothing will be cached! ');
+                    $cli->out('Enable it in site/config/config.php: \'cache\' => [\'pages\' => [\'active\' => true]]');
+                }
+
                 $skipMedia = $cli->arg('no-media') === true;
 
-                $domain = kirby()->option('e9li.kirby-fire.domain')
-                    ?: $cli->argOrPrompt('domain', 'Enter the domain to fire up (leave empty for ' . kirby()->url() . '):', false);
+                // explicit CLI argument wins over the config option; prompt
+                // only as a last resort and only on a terminal, so cron jobs
+                // fall through to the site URL instead of hanging
+                $domain = $cli->arg('domain')
+                    ?: kirby()->option('e9li.kirby-fire.domain')
+                    ?: (stream_isatty(STDIN)
+                        ? $cli->prompt('Enter the domain to fire up (leave empty for ' . kirby()->url() . '):', false)
+                        : '');
 
                 if (empty($domain) === false && filter_var($domain, FILTER_VALIDATE_URL) === false) {
                     $cli->br();
@@ -250,60 +343,60 @@ App::plugin('e9li/kirby-fire', [
                     exit(1);
                 }
 
-                $ignorePages = (array)kirby()->option('e9li.kirby-fire.ignore.page', []);
-                $ignoreLanguages = (array)kirby()->option('e9li.kirby-fire.ignore.language', []);
                 $browser = fireBrowser();
 
                 $pagesOn = 0;
                 $mediaOn = 0;
                 $failed = 0;
+                $skipped = 0;
                 $i = 1;
 
-                foreach (site()->pages()->index() as $page) {
-                    if (in_array($page->id(), $ignorePages, true)) {
+                foreach (firePageUrls() as $item) {
+                    $url = $item['url'];
+
+                    if (empty($domain) === false) {
+                        if (($url = fireRewriteUrl($url, $domain)) === null) {
+                            // e.g. a language living on its own domain — the
+                            // URL cannot be mapped onto the target domain
+                            $skipped++;
+                            continue;
+                        }
+                    }
+
+                    $result = fireWarm($browser, $url);
+
+                    // the error page renders (and caches) with HTTP 404 by
+                    // design — that is a warmed page, not a failure
+                    $expected404 = $item['isErrorPage'] === true && $result['status'] === 404;
+
+                    if ($result['status'] === 0 || ($result['status'] >= 400 && $expected404 === false)) {
+                        $cli->error($i . ': ' . $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
+                        $failed++;
+                        $i++;
                         continue;
                     }
 
-                    foreach (kirby()->languages() as $language) {
-                        if (in_array($language->code(), $ignoreLanguages, true)) {
-                            continue;
-                        }
+                    $cli->out($i . ': fire up ' . $url . ($expected404 ? ' (error page, 404 expected)' : ''));
+                    $pagesOn++;
+                    $i++;
 
-                        $url = $page->url($language->code());
+                    foreach ($skipMedia ? [] : $result['media'] as $mediaUrl) {
+                        $mediaResult = fireWarm($browser, $mediaUrl);
 
-                        if (empty($domain) === false) {
-                            if (($url = fireRewriteUrl($url, $domain)) === null) {
-                                continue;
-                            }
-                        }
-
-                        $result = fireWarm($browser, $url);
-
-                        if ($result['status'] >= 400 || $result['status'] === 0) {
-                            $cli->error($i . ': ' . $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
+                        if ($mediaResult['status'] >= 400 || $mediaResult['status'] === 0) {
+                            $cli->error('   media: ' . $mediaUrl . ' → ' . ($mediaResult['error'] ?? 'HTTP ' . $mediaResult['status']));
                             $failed++;
-                            $i++;
-                            continue;
-                        }
-
-                        $cli->out($i . ': fire up ' . $url);
-                        $pagesOn++;
-                        $i++;
-
-                        foreach ($skipMedia ? [] : $result['media'] as $mediaUrl) {
-                            $mediaResult = fireWarm($browser, $mediaUrl);
-
-                            if ($mediaResult['status'] >= 400 || $mediaResult['status'] === 0) {
-                                $cli->error('   media: ' . $mediaUrl . ' → ' . ($mediaResult['error'] ?? 'HTTP ' . $mediaResult['status']));
-                                $failed++;
-                            } else {
-                                $mediaOn++;
-                            }
+                        } else {
+                            $mediaOn++;
                         }
                     }
                 }
 
                 $cli->br();
+
+                if ($skipped > 0) {
+                    $cli->out($skipped . ' URL(s) skipped — they do not live below ' . kirby()->url() . ' and cannot be rewritten to ' . $domain . '.');
+                }
 
                 if ($failed > 0) {
                     $cli->error(' ' . $failed . ' URL(s) failed — see above. ');
@@ -397,28 +490,13 @@ App::plugin('e9li/kirby-fire', [
                 'action' => function (): array {
 
                     $data = [];
-                    $ignorePages = (array)kirby()->option('e9li.kirby-fire.ignore.page', []);
-                    $ignoreLanguages = (array)kirby()->option('e9li.kirby-fire.ignore.language', []);
-                    $pages = site()->pages()->index();
 
-                    foreach ($pages as $page) {
-                        if (in_array($page->id(), $ignorePages, true)) {
-                            continue;
-                        }
-
-                        foreach (kirby()->languages() as $language) {
-                            $languageCode = $language->code();
-
-                            if (in_array($languageCode, $ignoreLanguages, true)) {
-                                continue;
-                            }
-
-                            $data[] = [
-                                'url' => $page->url($languageCode),
-                                'language' => $languageCode,
-                                'state' => 'no-fire',
-                            ];
-                        }
+                    foreach (firePageUrls() as $item) {
+                        $data[] = [
+                            'url' => $item['url'],
+                            'language' => $item['language'],
+                            'state' => 'no-fire',
+                        ];
                     }
 
                     return $data;
@@ -444,7 +522,11 @@ App::plugin('e9li/kirby-fire', [
 
                     $result = fireWarm(fireBrowser(), $url);
 
-                    if ($result['status'] >= 400 || $result['status'] === 0) {
+                    // the error page renders (and caches) with HTTP 404 by
+                    // design — that is a warmed page, not a failure
+                    $expected404 = $result['status'] === 404 && fireIsErrorPageUrl($url);
+
+                    if ($result['status'] === 0 || ($result['status'] >= 400 && $expected404 === false)) {
                         return [
                             'url' => $url,
                             'language' => $language,
@@ -466,15 +548,12 @@ App::plugin('e9li/kirby-fire', [
                 'method' => 'POST',
                 'action' => function (): array {
 
-                    $flushed = [];
-
-                    foreach (['pages'] as $cache) {
-                        try {
-                            kirby()->cache($cache)->flush();
-                            $flushed[] = $cache;
-                        } catch (Throwable) {
-                            // cache type not available — nothing to flush
-                        }
+                    try {
+                        kirby()->cache('pages')->flush();
+                        $flushed = ['pages'];
+                    } catch (Throwable) {
+                        // pages cache not available — nothing to flush
+                        $flushed = [];
                     }
 
                     return [
