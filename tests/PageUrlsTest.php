@@ -54,6 +54,22 @@ class PageUrlsTest extends TestCase
         $this->assertCount(4, $urls); // home + error, in en + fr
     }
 
+    public function testUrlsReportCachedState(): void
+    {
+        $this->app([
+            'options' => [
+                'cache' => ['pages' => ['active' => true]],
+            ],
+        ]);
+
+        kirby()->cache('pages')->set('home.latest.html', 'cached html');
+
+        $byUrl = array_column(Pages::urls(), null, 'url');
+
+        $this->assertTrue($byUrl[self::BASE]['cached']);
+        $this->assertFalse($byUrl[self::BASE . '/about']['cached']);
+    }
+
     public function testIgnoredTemplatesAreSkipped(): void
     {
         // whole page classes can be excluded — typically redirect templates

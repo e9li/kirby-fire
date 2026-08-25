@@ -24,6 +24,24 @@ class StatusTest extends TestCase
         $this->assertSame(['active' => true, 'count' => 0], PagesCache::status());
     }
 
+    public function testHasDetectsCachedPages(): void
+    {
+        $this->app([
+            'options' => [
+                'cache' => ['pages' => ['active' => true]],
+            ],
+        ]);
+
+        $home = site()->page('home');
+        $this->assertFalse(PagesCache::has($home, null));
+
+        kirby()->cache('pages')->set('home.latest.html', 'cached html');
+
+        $this->assertTrue(PagesCache::has($home, null));
+        // language entries are separate cache ids
+        $this->assertFalse(PagesCache::has($home, 'de'));
+    }
+
     public function testCountsFileCacheEntries(): void
     {
         $this->app([

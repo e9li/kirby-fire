@@ -6,6 +6,7 @@ use E9li\Fire\Commands;
 use E9li\Fire\Jobs;
 use E9li\Fire\Pages;
 use E9li\Fire\PagesCache;
+use E9li\Fire\Progress;
 use E9li\Fire\Renderer;
 use E9li\Fire\Urls;
 use E9li\Fire\Warmer;
@@ -16,6 +17,7 @@ load([
     'e9li\\fire\\jobs' => __DIR__ . '/src/Jobs.php',
     'e9li\\fire\\pages' => __DIR__ . '/src/Pages.php',
     'e9li\\fire\\pagescache' => __DIR__ . '/src/PagesCache.php',
+    'e9li\\fire\\progress' => __DIR__ . '/src/Progress.php',
     'e9li\\fire\\renderer' => __DIR__ . '/src/Renderer.php',
     'e9li\\fire\\urls' => __DIR__ . '/src/Urls.php',
     'e9li\\fire\\warmer' => __DIR__ . '/src/Warmer.php',
@@ -131,53 +133,58 @@ App::plugin('e9li/kirby-fire', [
                 $pagesOn = 0;
                 $mediaOn = 0;
                 $failed = 0;
-                $i = 1;
                 $mediaQueue = [];
+
+                $progress = new Progress(count($targets), $cli->arg('quiet') !== true);
 
                 Warmer::warmAll(
                     $client,
                     array_keys($targets),
                     $concurrency,
                     true,
-                    function (string $url, array $result) use ($cli, $targets, &$pagesOn, &$failed, &$i, &$mediaQueue): void {
+                    function (string $url, array $result) use ($cli, $targets, $progress, &$pagesOn, &$failed, &$mediaQueue): void {
                         // the error page renders (and caches) with HTTP 404 by
                         // design — that is a warmed page, not a failure
                         $expected404 = $targets[$url] === true && $result['status'] === 404;
 
                         if ($result['status'] === 0 || ($result['status'] >= 400 && $expected404 === false)) {
-                            $cli->error($i . ': ' . $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
                             $failed++;
+                            $progress->error($cli, $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
                         } else {
-                            $cli->out($i . ': fire up ' . $url . ($expected404 ? ' (error page, 404 expected)' : ''));
-
                             $pagesOn++;
+                            $progress->advance('fire up ' . $url . ($expected404 ? ' (error page, 404 expected)' : ''));
 
                             foreach ($result['media'] as $mediaUrl) {
                                 $mediaQueue[$mediaUrl] = true;
                             }
                         }
-
-                        $i++;
                     }
                 );
+
+                $progress->finish();
 
                 if ($skipMedia === false && $mediaQueue !== []) {
                     // status-only requests: the thumb is generated server-side
                     // before the first body byte, so no image is downloaded
+                    $mediaProgress = new Progress(count($mediaQueue), $cli->arg('quiet') !== true);
+
                     Warmer::warmAll(
                         $client,
                         array_keys($mediaQueue),
                         $concurrency,
                         false,
-                        function (string $url, array $result) use ($cli, &$mediaOn, &$failed): void {
+                        function (string $url, array $result) use ($cli, $mediaProgress, &$mediaOn, &$failed): void {
                             if ($result['status'] === 0 || $result['status'] >= 400) {
-                                $cli->error('   media: ' . $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
                                 $failed++;
+                                $mediaProgress->error($cli, 'media: ' . $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
                             } else {
                                 $mediaOn++;
+                                $mediaProgress->advance('media ' . $url);
                             }
                         }
                     );
+
+                    $mediaProgress->finish();
                 }
 
                 $cli->br();
@@ -233,20 +240,21 @@ App::plugin('e9li/kirby-fire', [
 
                 $rendered = 0;
                 $failed = 0;
-                $i = 1;
 
-                Renderer::renderAll(function (array $result) use ($cli, &$rendered, &$failed, &$i): void {
+                $targets = Pages::targets();
+                $progress = new Progress(count($targets), $cli->arg('quiet') !== true);
+
+                Renderer::renderAll(function (array $result) use ($cli, $progress, &$rendered, &$failed): void {
                     if ($result['ok'] === false) {
-                        $cli->error($i . ': ' . $result['url'] . ' → ' . $result['error']);
                         $failed++;
+                        $progress->error($cli, $result['url'] . ' → ' . $result['error']);
                     } else {
-                        $cli->out($i . ': render ' . $result['url']);
-
                         $rendered++;
+                        $progress->advance('render ' . $result['url']);
                     }
+                }, $targets);
 
-                    $i++;
-                });
+                $progress->finish();
 
                 $cli->br();
 
@@ -285,22 +293,22 @@ App::plugin('e9li/kirby-fire', [
 
                 $rendered = 0;
                 $failed = 0;
-                $i = 1;
+
+                $progress = new Progress(count($jobs), $cli->arg('quiet') !== true);
 
                 foreach ($jobs as $job) {
                     $result = Jobs::thumb($job);
 
                     if ($result['ok'] === false) {
-                        $cli->error($i . ': ' . $job['path'] . ' → ' . $result['error']);
                         $failed++;
+                        $progress->error($cli, $job['path'] . ' → ' . $result['error']);
                     } else {
-                        $cli->out($i . ': ' . $job['filename']);
-
                         $rendered++;
+                        $progress->advance($job['filename']);
                     }
-
-                    $i++;
                 }
+
+                $progress->finish();
 
                 $cli->br();
 
@@ -354,7 +362,10 @@ App::plugin('e9li/kirby-fire', [
                         $data[] = [
                             'url' => $item['url'],
                             'language' => $item['language'],
-                            'state' => 'no-fire',
+                            // already-cached pages start as warmed — the row
+                            // states reflect the server-side cache, not just
+                            // what this browser session has crawled
+                            'state' => $item['cached'] === true ? 'fire-on' : 'no-fire',
                             // the browser-side crawl counts a 404 from the
                             // error page as warmed, like the CLI does
                             'isErrorPage' => $item['isErrorPage'],

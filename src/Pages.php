@@ -62,7 +62,9 @@ class Pages
 
     /**
      * URL list form of targets(), for the HTTP crawl and the fire/pages
-     * API route.
+     * API route. Each entry knows whether the page is already cached, so
+     * the Panel can show the real server-side state instead of starting
+     * every row at "no fire".
      */
     public static function urls(): array
     {
@@ -70,6 +72,7 @@ class Pages
             'url' => $target['url'],
             'language' => $target['language'],
             'isErrorPage' => $target['isErrorPage'],
+            'cached' => PagesCache::has($target['page'], $target['language']),
         ], static::targets());
     }
 

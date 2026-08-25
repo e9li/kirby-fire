@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.2
+
+- The CLI shows a progress bar with a rolling window of the last 5 URLs
+  instead of one line per URL — a 3000-page crawl is a handful of lines
+  now. Failures still print as persistent lines above the window. When the
+  output is not a terminal (cron, CI logs, pipes) every item logs as a
+  plain `n/total` line as before, and `--quiet` stays fully silent.
+- The Panel shows the real cache state when it opens: rows of pages that
+  are already cached start as "fire on" instead of everything starting at
+  "no fire". Previously the row states were only this browser session's
+  crawl progress, which read as "nothing is warmed" right after a
+  successful CLI run — the actual cache state was only visible in the
+  status line. The check mirrors core's cache id per page and language and
+  is verified against entries written by real renders, so a format change
+  in Kirby fails the test suite instead of going stale silently.
+
 ## 0.4.1
 
 Shared-hosting hardening. A field test on a large real-world site (3376

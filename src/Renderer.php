@@ -19,9 +19,10 @@ class Renderer
      * Renders every target page. Pages that are already cached come back
      * from the cache, so re-running is incremental. $onResult runs per page.
      */
-    public static function renderAll(?callable $onResult = null): array
+    public static function renderAll(?callable $onResult = null, ?array $targets = null): array
     {
         $kirby = kirby();
+        $targets ??= Pages::targets();
         $results = [];
         $inFlight = null;
 
@@ -39,7 +40,7 @@ class Renderer
             echo "'e9li.kirby-fire' => ['ignore' => ['template' => ['" . $inFlight['template'] . "']]]" . PHP_EOL;
         });
 
-        foreach (Pages::targets() as $target) {
+        foreach ($targets as $target) {
             if ($kirby->multilang() === true && $target['language'] !== null) {
                 $kirby->setCurrentLanguage($target['language']);
             }

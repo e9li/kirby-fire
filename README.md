@@ -106,8 +106,10 @@ Two things to know about `fire:thumbs`:
 
 ## Panel
 
-The plugin adds a **Fire** view with a button to flush the page cache. Its
-crawl runs **in your browser**: each page is fetched anonymously like a
+The plugin adds a **Fire** view with a button to flush the page cache. Pages
+that are already cached show as "fire on" when the view opens — the list
+reflects the server-side cache, however it was warmed. Its crawl runs **in
+your browser**: each page is fetched anonymously like a
 normal visit (so responses stay cacheable), and the thumbs found in the HTML
 are fetched the same way. Nothing is proxied through the server, so the
 crawl works wherever the site itself works — shared hosting included. Only

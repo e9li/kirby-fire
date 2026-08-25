@@ -46,6 +46,28 @@ class RendererTest extends TestCase
         $this->assertSame(9, PagesCache::status()['count']);
     }
 
+    public function testHasMatchesCoreCacheIds(): void
+    {
+        // PagesCache::has() mirrors the protected Page::cacheId() format —
+        // this closes the loop against entries core actually writes, so a
+        // format drift in Kirby fails here instead of going stale silently
+        $this->renderApp();
+        Renderer::renderAll();
+
+        $this->assertTrue(PagesCache::has(site()->page('home'), null));
+    }
+
+    public function testHasMatchesCoreCacheIdsPerLanguage(): void
+    {
+        $this->renderApp(['languages' => $this->languages()]);
+        Renderer::renderAll();
+
+        $home = site()->page('home');
+        $this->assertTrue(PagesCache::has($home, 'de'));
+        $this->assertTrue(PagesCache::has($home, 'fr'));
+        $this->assertFalse(PagesCache::has($home, 'nl'));
+    }
+
     public function testReportsRenderFailuresWithoutAborting(): void
     {
         $this->renderApp([
