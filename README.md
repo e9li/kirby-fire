@@ -144,10 +144,13 @@ after testing, before you commit.
     // local dev certificates (or pass --insecure to fire:up)
     'insecure' => false,
     'ignore' => [
-        // page ids, template names and language codes to skip; template
-        // ignores exclude whole page classes, e.g. redirect templates
+        // page ids to skip; append /* to ignore a whole branch:
+        // 'data/*' skips data and every page below it
         'page'     => [],
+        // template names to skip — whole page classes, e.g. redirect
+        // templates or hidden data pages
         'template' => [],
+        // language codes to skip
         'language' => [],
     ],
 ],

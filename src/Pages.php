@@ -32,7 +32,7 @@ class Pages
             // warmed — typically redirect templates, whose go() call ends
             // the process during an in-process render
             if (
-                in_array($page->id(), $ignorePages, true) ||
+                static::isIgnoredId($page->id(), $ignorePages) ||
                 in_array($template, $ignoreTemplates, true)
             ) {
                 continue;
@@ -58,6 +58,31 @@ class Pages
         }
 
         return $targets;
+    }
+
+    /**
+     * Whether a page id matches the ignore rules. Plain entries match
+     * exactly; a trailing "/*" ignores a whole branch — the page itself
+     * and everything below it ("data/*" skips data, data/forms,
+     * data/forms/entry, …).
+     */
+    public static function isIgnoredId(string $id, array $rules): bool
+    {
+        foreach ($rules as $rule) {
+            if ($rule === $id) {
+                return true;
+            }
+
+            if (str_ends_with((string)$rule, '/*') === true) {
+                $branch = substr($rule, 0, -2);
+
+                if ($id === $branch || str_starts_with($id, $branch . '/') === true) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

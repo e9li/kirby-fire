@@ -70,6 +70,65 @@ class PageUrlsTest extends TestCase
         $this->assertFalse($byUrl[self::BASE . '/about']['cached']);
     }
 
+    public function testBranchIgnoresSkipWholeSubtrees(): void
+    {
+        $this->app([
+            'roots' => [
+                'content' => __DIR__ . '/fixtures/content-nested',
+            ],
+            'options' => [
+                'e9li.kirby-fire' => [
+                    'ignore' => [
+                        'page' => ['data/*'],
+                    ],
+                ],
+            ],
+        ]);
+
+        // "data/*" skips data itself and everything below it
+        $this->assertSame([self::BASE], array_column(Pages::urls(), 'url'));
+    }
+
+    public function testExactIgnoresDoNotCoverChildren(): void
+    {
+        $this->app([
+            'roots' => [
+                'content' => __DIR__ . '/fixtures/content-nested',
+            ],
+            'options' => [
+                'e9li.kirby-fire' => [
+                    'ignore' => [
+                        'page' => ['data'],
+                    ],
+                ],
+            ],
+        ]);
+
+        $urls = array_column(Pages::urls(), 'url');
+
+        $this->assertNotContains(self::BASE . '/data', $urls);
+        $this->assertContains(self::BASE . '/data/forms', $urls);
+        $this->assertContains(self::BASE . '/data/forms/entry', $urls);
+    }
+
+    public function testIsIgnoredIdMatching(): void
+    {
+        $this->app();
+
+        // exact rules
+        $this->assertTrue(Pages::isIgnoredId('data', ['data']));
+        $this->assertFalse(Pages::isIgnoredId('data/forms', ['data']));
+
+        // branch rules cover the root and every descendant
+        $this->assertTrue(Pages::isIgnoredId('data', ['data/*']));
+        $this->assertTrue(Pages::isIgnoredId('data/forms', ['data/*']));
+        $this->assertTrue(Pages::isIgnoredId('data/forms/entry/deep', ['data/*']));
+
+        // but never unrelated ids sharing the prefix
+        $this->assertFalse(Pages::isIgnoredId('database', ['data/*']));
+        $this->assertFalse(Pages::isIgnoredId('database/x', ['data/*']));
+    }
+
     public function testIgnoredTemplatesAreSkipped(): void
     {
         // whole page classes can be excluded — typically redirect templates

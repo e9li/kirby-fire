@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.4
+
+- `ignore.page` supports branch rules: `'data/*'` skips `data` and every
+  page below it. Plain ids still match exactly — they never covered
+  children, which made ignoring hidden data branches (forms, product data)
+  effectively impossible one id at a time.
+
 ## 0.4.3
 
 Fixes for sites without a configured `url` option, where Kirby's CLI base
