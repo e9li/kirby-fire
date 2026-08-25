@@ -23,11 +23,31 @@ class Renderer
     {
         $kirby = kirby();
         $results = [];
+        $inFlight = null;
+
+        // Kirby's go() helper ends the process with die() — uncatchable.
+        // Without this guard a single redirecting template kills the whole
+        // run silently, with no way to tell which page was responsible.
+        register_shutdown_function(function () use (&$inFlight): void {
+            if ($inFlight === null) {
+                return;
+            }
+
+            echo PHP_EOL . 'Aborted while rendering ' . $inFlight['url'] . PHP_EOL;
+            echo 'The page ended the process — typically a template that redirects via go().' . PHP_EOL;
+            echo 'Skip its template and run again:' . PHP_EOL;
+            echo "'e9li.kirby-fire' => ['ignore' => ['template' => ['" . $inFlight['template'] . "']]]" . PHP_EOL;
+        });
 
         foreach (Pages::targets() as $target) {
             if ($kirby->multilang() === true && $target['language'] !== null) {
                 $kirby->setCurrentLanguage($target['language']);
             }
+
+            $inFlight = [
+                'url' => $target['url'],
+                'template' => $target['template'],
+            ];
 
             try {
                 $target['page']->render();
@@ -36,6 +56,7 @@ class Renderer
                 $result = ['url' => $target['url'], 'ok' => false, 'error' => $e->getMessage()];
             }
 
+            $inFlight = null;
             $results[] = $result;
 
             if ($onResult !== null) {

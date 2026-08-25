@@ -26,6 +26,7 @@ App::plugin('e9li/kirby-fire', [
         'domain' => '',
         'ignore' => [
             'page' => [],
+            'template' => [],
             'language' => [],
         ],
         // TLS verification is on by default; set to true for local dev
@@ -354,6 +355,9 @@ App::plugin('e9li/kirby-fire', [
                             'url' => $item['url'],
                             'language' => $item['language'],
                             'state' => 'no-fire',
+                            // the browser-side crawl counts a 404 from the
+                            // error page as warmed, like the CLI does
+                            'isErrorPage' => $item['isErrorPage'],
                         ];
                     }
 

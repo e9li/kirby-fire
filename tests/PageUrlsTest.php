@@ -54,6 +54,26 @@ class PageUrlsTest extends TestCase
         $this->assertCount(4, $urls); // home + error, in en + fr
     }
 
+    public function testIgnoredTemplatesAreSkipped(): void
+    {
+        // whole page classes can be excluded — typically redirect templates
+        // whose go() call would end an in-process render
+        $this->app([
+            'options' => [
+                'e9li.kirby-fire' => [
+                    'ignore' => [
+                        'template' => ['about'],
+                    ],
+                ],
+            ],
+        ]);
+
+        $urls = array_column(Pages::urls(), 'url');
+
+        $this->assertNotContains(self::BASE . '/about', $urls);
+        $this->assertCount(2, $urls); // home + error remain
+    }
+
     public function testMultilangUrlsPerLanguage(): void
     {
         $this->app(['languages' => $this->languages()]);

@@ -26,16 +26,11 @@ If you found a bug or have a suggestion, you can either:
 
 - The commands need the [Kirby CLI](https://github.com/getkirby/cli)
   (`composer global require getkirby/cli`).
-- The warmer requests the site over HTTP, and the Panel does so **from within
-  a request** — the server must be able to handle concurrent requests. With
-  PHP's built-in server this needs worker processes, or the self-request
-  deadlocks until it times out:
 
-  ```bash
-  PHP_CLI_SERVER_WORKERS=8 php -S localhost:8000 -t public kirby/router.php
-  ```
-
-  `fire:render` warms without HTTP and has neither requirement.
+There is no webserver requirement: the Panel crawls **from your browser**
+(every page is fetched like a normal visit), the CLI requests the site from
+outside, and `fire:render` warms without HTTP entirely — all three work on
+shared hosting, behind proxies, and on single-worker dev servers.
 
 ## Commands
 
@@ -91,8 +86,13 @@ hosting setups where the server cannot request its own public URL), no TLS,
 and every generated file belongs to the CLI user. Two caveats:
 
 - Set the `url` option — the URLs inside the cached HTML are based on it.
-- Templates that read request state (query, headers, session) render with an
-  empty CLI request. If your site depends on that, warm over HTTP instead.
+- Templates that read request state (query, headers, session, or
+  `$_SERVER['DOCUMENT_ROOT']`) render with an empty CLI request. If your
+  site depends on that, warm over HTTP instead.
+- Templates that redirect via `go()` end the process — Kirby implements
+  `go()` with `die()`, which nothing can catch. `fire:render` reports the
+  page and its template when that happens; add the template to the
+  `ignore.template` option and run again.
 
 ## Thumbs
 
@@ -106,8 +106,12 @@ Two things to know about `fire:thumbs`:
 
 ## Panel
 
-The plugin adds a **Fire** view that does the same crawl from the browser, plus a
-button to flush the page cache.
+The plugin adds a **Fire** view with a button to flush the page cache. Its
+crawl runs **in your browser**: each page is fetched anonymously like a
+normal visit (so responses stay cacheable), and the thumbs found in the HTML
+are fetched the same way. Nothing is proxied through the server, so the
+crawl works wherever the site itself works — shared hosting included. Only
+languages living on their own domains fall back to a server-side request.
 
 ## Development
 
@@ -138,8 +142,10 @@ after testing, before you commit.
     // local dev certificates (or pass --insecure to fire:up)
     'insecure' => false,
     'ignore' => [
-        // page ids and language codes to skip
+        // page ids, template names and language codes to skip; template
+        // ignores exclude whole page classes, e.g. redirect templates
         'page'     => [],
+        'template' => [],
         'language' => [],
     ],
 ],

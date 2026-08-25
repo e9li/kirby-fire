@@ -22,10 +22,45 @@ class Warmer
         $insecure ??= kirby()->option('e9li.kirby-fire.insecure') === true;
 
         return HttpClient::create([
-            'timeout' => (float)kirby()->option('e9li.kirby-fire.timeout', 60),
+            'timeout' => static::timeout(),
             'verify_peer' => $insecure === false,
             'verify_host' => $insecure === false,
         ]);
+    }
+
+    /**
+     * Per-request timeout. In web context (the Panel's fallback route) it is
+     * capped below PHP's max_execution_time, so an unreachable or slow
+     * target produces a clean per-URL error instead of the request being
+     * killed with a fatal — the common failure on shared hosting, where
+     * execution limits are low and loopback requests often hang.
+     */
+    public static function timeout(): float
+    {
+        $configured = (float)kirby()->option('e9li.kirby-fire.timeout', 60);
+
+        if (PHP_SAPI === 'cli') {
+            return $configured;
+        }
+
+        $elapsed = microtime(true) - ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true));
+
+        return static::cappedTimeout($configured, (int)ini_get('max_execution_time'), $elapsed);
+    }
+
+    /**
+     * Web requests die hard at max_execution_time; leave headroom so the
+     * request can still answer with an error.
+     */
+    public static function cappedTimeout(float $configured, int $limit, float $elapsed): float
+    {
+        if ($limit <= 0) {
+            return $configured;
+        }
+
+        $budget = $limit - $elapsed - 5.0;
+
+        return max(3.0, min($configured, $budget));
     }
 
     /**

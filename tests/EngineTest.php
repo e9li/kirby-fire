@@ -153,6 +153,21 @@ class EngineTest extends TestCase
         );
     }
 
+    public function testCappedTimeoutLeavesExecutionHeadroom(): void
+    {
+        // no execution limit (CLI): the configured timeout wins
+        $this->assertSame(60.0, Warmer::cappedTimeout(60.0, 0, 120.0));
+
+        // 60s limit, 10s spent → 45s budget (5s headroom to answer cleanly)
+        $this->assertSame(45.0, Warmer::cappedTimeout(60.0, 60, 10.0));
+
+        // configured timeout below the budget stays untouched
+        $this->assertSame(15.0, Warmer::cappedTimeout(15.0, 60, 10.0));
+
+        // nearly exhausted request: never below the 3s floor
+        $this->assertSame(3.0, Warmer::cappedTimeout(60.0, 30, 29.0));
+    }
+
     public function testWarmAllRetriesAndReportsTransportErrors(): void
     {
         $this->app();

@@ -66,6 +66,7 @@ export default {
             index: 0,
             items: [],
             known: new Set(),
+            origins: new Set(),
             status: {
                 active: null,
                 count: null,
@@ -83,6 +84,7 @@ export default {
             this.$api.get("fire/pages").then((data) => {
                 this.items = data;
                 this.known = new Set(data.map((item) => item.url));
+                this.origins = new Set(data.map((item) => new URL(item.url).origin));
             });
             this.loadStatus();
         },
@@ -92,6 +94,69 @@ export default {
             this.$api.get("fire/status").then((data) => {
                 this.status = data;
             });
+        },
+        // browser-side mirror of Urls::media() — same-site /media/ URLs
+        // from src/srcset attributes
+        mediaUrls(html) {
+            const urls = new Set();
+
+            for (const match of html.matchAll(/(?:src|srcset)="([^"]+)"/gi)) {
+                for (const candidate of match[1].split(",")) {
+                    const url = candidate.trim().split(/\s+/)[0] || "";
+
+                    if (url.includes("/media/") && this.isAllowed(url)) {
+                        urls.add(url);
+                    }
+                }
+            }
+
+            return [...urls];
+        },
+        isAllowed(url) {
+            try {
+                return this.origins.has(new URL(url).origin);
+            } catch {
+                return false;
+            }
+        },
+        // The browser fetches the page itself: a normal top-level request,
+        // exactly like a visitor. Unlike the old server-side self-request
+        // this cannot deadlock single-worker servers and does not depend on
+        // the server being able to reach its own public URL — which is what
+        // made the Panel fail on shared hosting. credentials are omitted so
+        // the response stays as cacheable as for an anonymous visitor.
+        async warm(item) {
+            try {
+                const response = await fetch(item.url, {
+                    credentials: "omit",
+                    cache: "no-store",
+                });
+
+                const expected404 = item.isErrorPage === true && response.status === 404;
+
+                if (response.ok === false && expected404 === false) {
+                    return { ...item, state: "extinguished", error: "HTTP " + response.status };
+                }
+
+                const type = response.headers.get("content-type") || "";
+                const media = type.includes("text/html")
+                    ? this.mediaUrls(await response.text())
+                    : [];
+
+                return { ...item, state: "fire-on", error: null, media };
+            } catch {
+                // cross-origin (a language on its own domain) or a network
+                // failure — fall back to the server-side warm route
+                try {
+                    return await this.$api.post("fire/up", item);
+                } catch {
+                    return {
+                        ...item,
+                        state: "extinguished",
+                        error: this.$t("e9li.kirby-fire.error.request"),
+                    };
+                }
+            }
         },
         queueMedia(index, media) {
             // thumbs of a warmed page are queued right behind it, so Kirby's
@@ -134,7 +199,7 @@ export default {
 
             this.items[index].state = "fire-up";
 
-            this.$api.post("fire/up", this.items[index])
+            this.warm(this.items[index])
                 .then((data) => {
                     // splice instead of items[index] = data — Vue 2 cannot
                     // observe by-index array assignments, which left the last

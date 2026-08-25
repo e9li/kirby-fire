@@ -17,6 +17,7 @@ class Pages
     public static function targets(): array
     {
         $ignorePages = (array)kirby()->option('e9li.kirby-fire.ignore.page', []);
+        $ignoreTemplates = (array)kirby()->option('e9li.kirby-fire.ignore.template', []);
         $ignoreLanguages = (array)kirby()->option('e9li.kirby-fire.ignore.language', []);
 
         $languages = kirby()->languages();
@@ -25,7 +26,15 @@ class Pages
         $targets = [];
 
         foreach (site()->pages()->index() as $page) {
-            if (in_array($page->id(), $ignorePages, true)) {
+            $template = $page->intendedTemplate()->name();
+
+            // template ignores exist for whole page classes that cannot be
+            // warmed — typically redirect templates, whose go() call ends
+            // the process during an in-process render
+            if (
+                in_array($page->id(), $ignorePages, true) ||
+                in_array($template, $ignoreTemplates, true)
+            ) {
                 continue;
             }
 
@@ -40,6 +49,7 @@ class Pages
                     'page' => $page,
                     'url' => $page->url($code),
                     'language' => $code,
+                    'template' => $template,
                     // the error page answers with HTTP 404 by design — HTTP
                     // callers must count that as warmed, not as a failure
                     'isErrorPage' => $page->isErrorPage(),

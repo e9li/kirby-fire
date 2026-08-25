@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.1
+
+Shared-hosting hardening. A field test on a large real-world site (3376
+pages, 4 languages, image-heavy, single-worker dev server,
+`max_execution_time` 60) uncovered several failure modes.
+
+- **The Panel crawls from the browser now.** Each page is fetched by the
+  Panel user's browser like a normal, anonymous visit — instead of the
+  server requesting its own public URL from inside the API request. The old
+  self-request design deadlocked single-worker servers and died in
+  "Maximum execution time exceeded" fatals on hosts with low execution
+  limits, i.e. typical shared hosting. Media URLs are extracted
+  client-side; only languages on their own domains still go through the
+  server-side route, as a cross-origin fallback.
+- The fallback route's HTTP timeout is capped below PHP's
+  `max_execution_time`, so a hanging target produces a clean per-row error
+  instead of a PHP fatal.
+- New `ignore.template` option to skip whole page classes — needed for
+  redirect templates: Kirby implements `go()` with `die()`, which no
+  crawler can catch, and per-page ignores don't scale to dozens of
+  redirecting pages.
+- `fire:render` no longer dies silently when a template redirects: a
+  shutdown guard names the aborting page and the template to add to
+  `ignore.template`. (The die itself is uncatchable — the guard makes it
+  diagnosable instead of invisible.)
+
 ## 0.4.0
 
 - New `fire:render` command: warms the pages cache **in-process, without any
