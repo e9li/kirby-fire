@@ -123,21 +123,6 @@ Kirby installation when the plugin lives in `site/plugins/`. The committed
 `vendor/` folder must stay dependency-only — run `composer install --no-dev`
 after testing, before you commit.
 
-### Releasing
-
-`vendor/` is committed on purpose: ZIP downloads and Git submodule installs
-run no Composer step, so the plugin must work as a plain folder. Composer
-installs resolve the same dependencies into the site's own vendor folder and
-simply ignore the embedded copy. The flip side: embedded dependencies only
-update when a new version is tagged — release a patch when `composer audit`
-reports an advisory.
-
-1. `composer update && composer test && composer install --no-dev`
-2. `npm run build` if Panel sources changed
-3. Bump `version` in `composer.json`, update `CHANGELOG.md`
-4. Commit, tag `vX.Y.Z`, push — Packagist follows the GitHub mirror
-   automatically
-
 ## Options
 
 ```php
