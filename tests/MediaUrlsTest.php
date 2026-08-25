@@ -2,6 +2,8 @@
 
 namespace E9li\Fire\Tests;
 
+use E9li\Fire\Urls;
+
 class MediaUrlsTest extends TestCase
 {
     public function testExtractsAndDeduplicatesMediaUrls(): void
@@ -19,7 +21,7 @@ class MediaUrlsTest extends TestCase
             'https://example.test/media/pages/home/123/img-800x.jpg',
             'https://example.test/media/pages/home/123/img-400x.jpg',
             'https://example.test/media/pages/home/123/img-1200x.jpg',
-        ], fireMediaUrls($html));
+        ], Urls::media($html));
     }
 
     public function testPictureSourcesAndDensityDescriptors(): void
@@ -37,7 +39,7 @@ class MediaUrlsTest extends TestCase
             'https://example.test/media/pages/a/1/img.webp',
             'https://example.test/media/pages/a/1/img-2x.webp',
             'https://example.test/media/pages/a/1/img.jpg',
-        ], fireMediaUrls($html));
+        ], Urls::media($html));
     }
 
     public function testIgnoresForeignAndNonMediaUrls(): void
@@ -54,13 +56,13 @@ class MediaUrlsTest extends TestCase
         // plugin assets under /media/ are legitimate warm targets
         $this->assertSame([
             'https://example.test/media/plugins/vendor/plugin/index.js',
-        ], fireMediaUrls($html));
+        ], Urls::media($html));
     }
 
     public function testEmptyForHtmlWithoutMedia(): void
     {
         $this->app();
 
-        $this->assertSame([], fireMediaUrls('<h1>Hello</h1>'));
+        $this->assertSame([], Urls::media('<h1>Hello</h1>'));
     }
 }

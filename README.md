@@ -35,6 +35,8 @@ If you found a bug or have a suggestion, you can either:
   PHP_CLI_SERVER_WORKERS=8 php -S localhost:8000 -t public kirby/router.php
   ```
 
+  `fire:render` warms without HTTP and has neither requirement.
+
 ## Commands
 
 ```bash
@@ -42,8 +44,14 @@ kirby fire:up                     # crawl every page in every language, then its
 kirby fire:up --no-media          # …without the thumbs
 kirby fire:up --concurrency 10    # crawl with 10 requests in flight (default 5)
 kirby fire:up --insecure          # skip TLS verification (local dev certificates)
+kirby fire:up --fresh             # flush the pages cache first
+kirby fire:render                 # render pages in-process into the cache — no HTTP
 kirby fire:thumbs                 # render pending thumbs in-process
 ```
+
+Every command exits non-zero when something failed, and the Kirby CLI's
+global `--quiet` flag silences the output — together that makes them
+cron-friendly: `kirby fire:render --fresh --quiet && kirby fire:thumbs --quiet`.
 
 `fire:up` warms the page cache by requesting every page over HTTP — with up to
 `--concurrency` requests in flight — and picks the thumbs out of the returned
@@ -65,6 +73,28 @@ on a large site:
 ```bash
 kirby fire:up --no-media && kirby fire:thumbs
 ```
+
+## In-process warming
+
+`fire:render` skips HTTP entirely: it renders every page in every language
+in-process. `Page::render()` fills the pages cache itself, and the cache keys
+are request-independent, so the entries are exactly what later HTTP requests
+read. Rendering also queues the thumb job files — the complete warm-up for a
+large site is:
+
+```bash
+kirby fire:render --fresh && kirby fire:thumbs
+```
+
+Compared to the HTTP crawl this needs no reachable webserver (including
+hosting setups where the server cannot request its own public URL), no TLS,
+and every generated file belongs to the CLI user. Two caveats:
+
+- Set the `url` option — the URLs inside the cached HTML are based on it.
+- Templates that read request state (query, headers, session) render with an
+  empty CLI request. If your site depends on that, warm over HTTP instead.
+
+## Thumbs
 
 Two things to know about `fire:thumbs`:
 

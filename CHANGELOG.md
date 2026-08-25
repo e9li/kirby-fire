@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.0
+
+- New `fire:render` command: warms the pages cache **in-process, without any
+  HTTP**. `Page::render()` fills the cache itself and the cache keys are
+  request-independent, so the entries are exactly what later HTTP requests
+  read. Rendering also queues the thumb jobs, so
+  `fire:render --fresh && fire:thumbs` is a complete warm-up that needs no
+  reachable webserver, no TLS and no loopback — and every generated file
+  belongs to one user. Caveat: templates that read request state render with
+  an empty CLI request; warm over HTTP in that case.
+- Commands exit non-zero when a URL, render or thumb failed, so cron and CI
+  can alert on it. The Kirby CLI's global `--quiet` flag silences the
+  output; the exit code still carries the outcome.
+- New `--fresh` flag on `fire:up` and `fire:render`: flushes the pages cache
+  first, so a full re-warm is one command (and wiped media folders get their
+  thumb jobs re-queued — the manual flush the README used to prescribe).
+- All plugin code moved from global functions into `E9li\Fire\` classes
+  (`Commands`, `Jobs`, `Pages`, `PagesCache`, `Renderer`, `Urls`, `Warmer`),
+  autoloaded via Kirby's `load()` helper. The global `fire*()` functions no
+  longer exist, so they cannot collide with other plugins.
+- New renderer tests: in-process renders write real cache entries (single-
+  and multilanguage) and template failures are reported per page instead of
+  aborting the run.
+- CI moved from `.github/workflows/` to `.forgejo/workflows/` — the plugin
+  is developed on a Forgejo instance whose runner advertises the `docker`
+  label, so `runs-on: ubuntu-latest` never matched and the jobs stayed
+  queued forever. Third-party actions are referenced by their full GitHub
+  URL now, dependencies install from the lock file, and the passive GitHub
+  mirror no longer accumulates stuck workflow runs.
+
 ## 0.3.0
 
 HTTP engine rework — the crawl is built for sites with many pages and images.

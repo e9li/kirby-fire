@@ -2,13 +2,15 @@
 
 namespace E9li\Fire\Tests;
 
+use E9li\Fire\Pages;
+
 class PageUrlsTest extends TestCase
 {
     public function testSingleLanguageSiteYieldsEveryPage(): void
     {
         $this->app();
 
-        $urls = firePageUrls();
+        $urls = Pages::urls();
 
         // fixtures: home, error, about — with no languages folder the
         // language must fall back to null instead of skipping every page
@@ -25,7 +27,7 @@ class PageUrlsTest extends TestCase
     {
         $this->app();
 
-        $flagged = array_values(array_filter(firePageUrls(), fn ($u) => $u['isErrorPage']));
+        $flagged = array_values(array_filter(Pages::urls(), fn ($u) => $u['isErrorPage']));
 
         $this->assertCount(1, $flagged);
         $this->assertSame(self::BASE . '/error', $flagged[0]['url']);
@@ -45,7 +47,7 @@ class PageUrlsTest extends TestCase
             ],
         ]);
 
-        $urls = firePageUrls();
+        $urls = Pages::urls();
 
         $this->assertSame(['en', 'fr'], array_values(array_unique(array_column($urls, 'language'))));
         $this->assertNotContains(self::BASE . '/about', array_column($urls, 'url'));
@@ -56,7 +58,7 @@ class PageUrlsTest extends TestCase
     {
         $this->app(['languages' => $this->languages()]);
 
-        $urls = firePageUrls();
+        $urls = Pages::urls();
         $byLanguage = [];
 
         foreach ($urls as $item) {
@@ -80,13 +82,13 @@ class PageUrlsTest extends TestCase
     {
         $this->app(['languages' => $this->languages()]);
 
-        $this->assertTrue(fireIsErrorPageUrl(self::BASE . '/error'));
-        $this->assertTrue(fireIsErrorPageUrl(self::BASE . '/de/error'));
-        $this->assertTrue(fireIsErrorPageUrl('https://fr.example.test/error'));
+        $this->assertTrue(Pages::isErrorPageUrl(self::BASE . '/error'));
+        $this->assertTrue(Pages::isErrorPageUrl(self::BASE . '/de/error'));
+        $this->assertTrue(Pages::isErrorPageUrl('https://fr.example.test/error'));
 
-        $this->assertFalse(fireIsErrorPageUrl(self::BASE));
-        $this->assertFalse(fireIsErrorPageUrl(self::BASE . '/about'));
-        $this->assertFalse(fireIsErrorPageUrl('https://other.test/error'));
+        $this->assertFalse(Pages::isErrorPageUrl(self::BASE));
+        $this->assertFalse(Pages::isErrorPageUrl(self::BASE . '/about'));
+        $this->assertFalse(Pages::isErrorPageUrl('https://other.test/error'));
     }
 
     public function testPagesCacheDetection(): void

@@ -2,6 +2,8 @@
 
 namespace E9li\Fire\Tests;
 
+use E9li\Fire\Warmer;
+
 use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -28,7 +30,7 @@ class EngineTest extends TestCase
             'status' => 200,
             'error' => null,
             'media' => ['https://example.test/media/pages/home/1/img-400x.jpg'],
-        ], fireWarm($client, 'https://example.test'));
+        ], Warmer::warm($client, 'https://example.test'));
     }
 
     public function testWarmReportsHttpErrorsWithoutThrowing(): void
@@ -36,7 +38,7 @@ class EngineTest extends TestCase
         $this->app();
 
         $client = new MockHttpClient($this->html('<h1>Not found</h1>', 404));
-        $result = fireWarm($client, 'https://example.test/missing');
+        $result = Warmer::warm($client, 'https://example.test/missing');
 
         $this->assertSame(404, $result['status']);
         $this->assertNull($result['error']);
@@ -55,7 +57,7 @@ class EngineTest extends TestCase
             return $this->html('<h1>ok</h1>');
         });
 
-        $result = fireWarm($client, 'https://example.test');
+        $result = Warmer::warm($client, 'https://example.test');
 
         $this->assertSame(200, $result['status']);
         $this->assertSame(2, $calls);
@@ -71,7 +73,7 @@ class EngineTest extends TestCase
             throw new TransportException('connection refused');
         });
 
-        $result = fireWarm($client, 'https://example.test');
+        $result = Warmer::warm($client, 'https://example.test');
 
         $this->assertSame(0, $result['status']);
         $this->assertSame('connection refused', $result['error']);
@@ -86,7 +88,7 @@ class EngineTest extends TestCase
         $client = new MockHttpClient(fn () => $this->html('<h1>ok</h1>'));
 
         $completed = [];
-        $results = fireWarmAll($client, $urls, 3, true, function (string $url) use (&$completed): void {
+        $results = Warmer::warmAll($client, $urls, 3, true, function (string $url) use (&$completed): void {
             $completed[] = $url;
         });
 
@@ -107,7 +109,7 @@ class EngineTest extends TestCase
             $this->html('<h1>ok</h1>'),
         ]);
 
-        $results = fireWarmAll(
+        $results = Warmer::warmAll(
             $client,
             ['https://example.test/error', 'https://example.test'],
             2,
@@ -127,7 +129,7 @@ class EngineTest extends TestCase
             '<img srcset="https://example.test/media/a/1/i.jpg 400w, https://example.test/media/a/1/j.jpg 800w">'
         ));
 
-        $results = fireWarmAll($client, ['https://example.test'], 5, true);
+        $results = Warmer::warmAll($client, ['https://example.test'], 5, true);
 
         $this->assertSame([
             'https://example.test/media/a/1/i.jpg',
@@ -143,7 +145,7 @@ class EngineTest extends TestCase
             '<img src="https://example.test/media/a/1/i.jpg">'
         ));
 
-        $results = fireWarmAll($client, ['https://example.test/media/x.jpg'], 5, false);
+        $results = Warmer::warmAll($client, ['https://example.test/media/x.jpg'], 5, false);
 
         $this->assertSame(
             ['status' => 200, 'error' => null, 'media' => []],
@@ -170,7 +172,7 @@ class EngineTest extends TestCase
             return $this->html('<h1>ok</h1>');
         });
 
-        $results = fireWarmAll(
+        $results = Warmer::warmAll(
             $client,
             ['https://example.test/flaky', 'https://example.test/dead', 'https://example.test/fine'],
             2,

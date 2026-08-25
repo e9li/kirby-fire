@@ -2,6 +2,7 @@
 
 namespace E9li\Fire\Tests;
 
+use E9li\Fire\Jobs;
 use Kirby\Cms\Page;
 use Kirby\Cms\Site;
 
@@ -22,7 +23,7 @@ class JobsTest extends TestCase
     {
         $this->app();
 
-        $this->assertSame([], fireJobs());
+        $this->assertSame([], Jobs::all());
     }
 
     public function testFindsAndResolvesJobs(): void
@@ -38,7 +39,7 @@ class JobsTest extends TestCase
 
         $this->app();
 
-        $jobs = fireJobs();
+        $jobs = Jobs::all();
         $this->assertCount(3, $jobs);
 
         $byPath = array_column($jobs, null, 'path');
@@ -65,7 +66,7 @@ class JobsTest extends TestCase
 
         $this->app();
 
-        $jobs = fireJobs();
+        $jobs = Jobs::all();
         $this->assertCount(1, $jobs);
 
         // blog/2026/post does not exist in the fixtures: the id must still
