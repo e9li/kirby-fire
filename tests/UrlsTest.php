@@ -56,4 +56,16 @@ class UrlsTest extends TestCase
         $this->assertNull(Urls::rewrite('https://foreign.test/a', 'https://live.com'));
         $this->assertNull(Urls::rewrite(self::BASE . '.evil.com/a', 'https://live.com'));
     }
+
+    public function testRewriteWithoutUrlOption(): void
+    {
+        // without a url option Kirby's CLI base is "/": page URLs come in
+        // root-relative (even double-slashed) and used to be rewritten to
+        // https://domain//path, which 404s
+        $this->app(['urls' => ['index' => '/']]);
+
+        $this->assertSame('https://live.com', Urls::rewrite('/', 'https://live.com'));
+        $this->assertSame('https://live.com/a/b', Urls::rewrite('/a/b', 'https://live.com'));
+        $this->assertSame('https://live.com/a/b', Urls::rewrite('//a/b', 'https://live.com'));
+    }
 }

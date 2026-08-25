@@ -117,8 +117,23 @@ class Warmer
         $inFlight = [];
         $results = [];
 
-        $request = function (string $url, int $attempt) use ($client, $bodies, &$inFlight): void {
-            $response = $client->request('GET', $url, ['buffer' => $bodies]);
+        $request = function (string $url, int $attempt) use ($client, $bodies, &$inFlight, &$results, $onResult): void {
+            try {
+                $response = $client->request('GET', $url, ['buffer' => $bodies]);
+            } catch (\Throwable $e) {
+                // thrown synchronously, e.g. for a malformed URL (missing
+                // scheme when the url option is not set) — fail this one
+                // URL instead of aborting the whole run; no retry, the
+                // error is permanent
+                $results[$url] = ['status' => 0, 'error' => $e->getMessage(), 'media' => []];
+
+                if ($onResult !== null) {
+                    $onResult($url, $results[$url]);
+                }
+
+                return;
+            }
+
             $inFlight[spl_object_id($response)] = [
                 'url' => $url,
                 'attempt' => $attempt,

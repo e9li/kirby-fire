@@ -153,6 +153,29 @@ class EngineTest extends TestCase
         );
     }
 
+    public function testWarmAllFailsMalformedUrlsWithoutAborting(): void
+    {
+        // request() throws synchronously for URLs without a scheme (the
+        // unset-url-option case) — that must fail the one URL, not kill
+        // the whole crawl. MockHttpClient does not validate URLs like the
+        // real clients do, so the factory replicates the synchronous throw.
+        $this->app();
+
+        $client = new MockHttpClient(function (string $method, string $url) {
+            if (str_contains($url, 'example.test') === false) {
+                throw new \InvalidArgumentException('Invalid URL: scheme is missing in "/relative".');
+            }
+
+            return $this->html('<h1>ok</h1>');
+        });
+
+        $results = Warmer::warmAll($client, ['/relative', 'https://example.test'], 2, true);
+
+        $this->assertSame(0, $results['/relative']['status']);
+        $this->assertStringContainsString('scheme', $results['/relative']['error']);
+        $this->assertSame(200, $results['https://example.test']['status']);
+    }
+
     public function testCappedTimeoutLeavesExecutionHeadroom(): void
     {
         // no execution limit (CLI): the configured timeout wins

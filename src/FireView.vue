@@ -84,7 +84,9 @@ export default {
             this.$api.get("fire/pages").then((data) => {
                 this.items = data;
                 this.known = new Set(data.map((item) => item.url));
-                this.origins = new Set(data.map((item) => new URL(item.url).origin));
+                // the base argument keeps root-relative URLs working (sites
+                // without a configured url option)
+                this.origins = new Set(data.map((item) => new URL(item.url, location.origin).origin));
             });
             this.loadStatus();
         },
@@ -114,7 +116,7 @@ export default {
         },
         isAllowed(url) {
             try {
-                return this.origins.has(new URL(url).origin);
+                return this.origins.has(new URL(url, location.origin).origin);
             } catch {
                 return false;
             }

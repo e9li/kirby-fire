@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.3
+
+Fixes for sites without a configured `url` option, where Kirby's CLI base
+URL is `/` and page URLs come in root-relative (found on a production
+shared server).
+
+- **Domain rewriting produced double slashes** (`https://domain//path`),
+  which many servers answer with 404. The rewrite normalizes the boundary
+  now.
+- **A malformed target URL aborted the whole crawl** with an uncaught
+  "Invalid URL: scheme is missing" exception. Synchronous request errors
+  now fail the one URL like any other error.
+- `fire:up` refuses to start without a usable base URL and no domain,
+  with a clear message — and the prompt no longer offers "leave empty
+  for /". Passing a domain remains enough; setting the `url` option is
+  recommended (fire:render needs it anyway).
+- The Panel handles root-relative page URLs (same unset-url setups).
+
 ## 0.4.2
 
 - The CLI shows a progress bar with a rolling window of the last 5 URLs

@@ -53,17 +53,22 @@ class Urls
     public static function rewrite(string $url, string $domain): ?string
     {
         $siteBase = rtrim(kirby()->url(), '/');
+        $domain = rtrim($domain, '/');
 
-        // the home page URL is the site base itself, without a trailing slash
-        if ($url === $siteBase) {
-            return rtrim($domain, '/');
+        // the home page URL is the site base itself, without a trailing
+        // slash — or bare "/" when the url option is not set
+        if ($url === $siteBase || $url === $siteBase . '/') {
+            return $domain;
         }
 
         if (str_starts_with($url, $siteBase . '/') === false) {
             return null;
         }
 
-        return rtrim($domain, '/') . substr($url, strlen($siteBase));
+        // ltrim guards the unset-url-option case: the base is "/" then and
+        // page URLs come in root-relative (even double-slashed), which used
+        // to produce https://domain//path
+        return $domain . '/' . ltrim(substr($url, strlen($siteBase)), '/');
     }
 
     /**

@@ -85,18 +85,37 @@ App::plugin('e9li/kirby-fire', [
 
                 $skipMedia = $cli->arg('no-media') === true;
 
+                // without the url option Kirby's CLI base is "/" — page URLs
+                // are root-relative then and a domain is the only way to
+                // build requestable URLs
+                $hasBase = rtrim(kirby()->url(), '/') !== '';
+
                 // explicit CLI argument wins over the config option; prompt
                 // only as a last resort and only on a terminal, so cron jobs
                 // fall through to the site URL instead of hanging
                 $domain = $cli->arg('domain')
                     ?: kirby()->option('e9li.kirby-fire.domain')
                     ?: (stream_isatty(STDIN)
-                        ? $cli->prompt('Enter the domain to fire up (leave empty for ' . kirby()->url() . '):', false)
+                        ? $cli->prompt(
+                            $hasBase
+                                ? 'Enter the domain to fire up (leave empty for ' . kirby()->url() . '):'
+                                : 'Enter the domain to fire up (required — the url option is not set):',
+                            false
+                        )
                         : '');
 
                 if (empty($domain) === false && filter_var($domain, FILTER_VALIDATE_URL) === false) {
                     $cli->br();
                     $cli->error(' Invalid domain! Use a full URL like https://domain.com ');
+                    $cli->br();
+                    exit(1);
+                }
+
+                if (empty($domain) === true && $hasBase === false) {
+                    $cli->br();
+                    $cli->error(' No usable site URL — the url option is not set. ');
+                    $cli->out('Pass a domain ("kirby fire:up https://example.com") or set the url');
+                    $cli->out('option in site/config/config.php (fire:render needs it as well).');
                     $cli->br();
                     exit(1);
                 }
