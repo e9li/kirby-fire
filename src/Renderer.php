@@ -50,10 +50,15 @@ class Renderer
                 'template' => $target['template'],
             ];
 
+            $result = [
+                'url' => $target['url'],
+                'id' => $target['page']->id(),
+                'language' => $target['language'],
+            ];
+
             try {
                 $target['page']->render();
-                $result = [
-                    'url' => $target['url'],
+                $result += [
                     'ok' => true,
                     'error' => null,
                     // rendered fine, but did Kirby actually write the cache?
@@ -62,7 +67,7 @@ class Renderer
                     'cached' => PagesCache::has($target['page'], $target['language']),
                 ];
             } catch (\Throwable $e) {
-                $result = ['url' => $target['url'], 'ok' => false, 'error' => $e->getMessage(), 'cached' => false];
+                $result += ['ok' => false, 'error' => $e->getMessage(), 'cached' => false];
             }
 
             $inFlight = null;

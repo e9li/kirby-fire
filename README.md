@@ -75,6 +75,12 @@ them as warmed — typical causes are `csrf()` or `$kirby->session()` in an
 always-rendered snippet (header, footer, popup). Fix the template, not the
 crawler: read cookies lazily, or fetch tokens and cart states via JS.
 
+The CLI and the Panel share their results: per-page outcomes (not
+cacheable, failed and why) are recorded in one state file below
+`site/cache`, so the Panel presents a CLI or cron run's outcome on load —
+green rows from the pages cache itself, problem rows with their reasons
+from the last run, wherever it ran.
+
 Kirby does not generate a thumbnail while a page renders — it writes one job file
 per thumb and runs the darkroom only when the media URL is first requested. So
 `fire:up`'s thumb pass still costs one HTTP round-trip per size per image, even

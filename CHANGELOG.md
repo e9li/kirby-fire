@@ -6,6 +6,16 @@ Memory hardening for large media libraries on constrained hosts, after a
 production run died at thumb 284 of 5296 with a 128 MB CLI limit — and
 honest reporting for pages Kirby refuses to cache.
 
+- **The CLI and the Panel present the same state.** Both record per-page
+  outcomes (not cacheable, failed with its error message) into one shared
+  state file below `site/cache` — keyed by page id and language, so it
+  survives domain overrides and multi-domain setups. Opening the Panel
+  after a CLI or cron run shows every problem row with its reason
+  immediately, no crawling needed; Panel crawl results persist across
+  reloads the same way. Cached pages are never stored there — the pages
+  cache on disk stays their single source of truth. Local runs also verify
+  cache writes against the disk, which catches pages that disable caching
+  without a no-store header (`$kirby->response()->cache(false)`).
 - **The Panel follows the crawl.** The view auto-scrolls to keep the row
   currently being warmed in sight — on a 3000-row site you no longer lose
   track. Scrolling manually pauses the follow immediately (the view never

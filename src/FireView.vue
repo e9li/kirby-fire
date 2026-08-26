@@ -90,6 +90,7 @@ export default {
             origins: new Set(),
             followCrawl: true,
             showTop: false,
+            pending: {},
             status: {
                 active: null,
                 count: null,
@@ -259,6 +260,7 @@ export default {
                 this.isHeatingUp = false;
                 this.index = 0;
                 this.loadStatus();
+                this.flushState();
                 return;
             }
 
@@ -275,15 +277,18 @@ export default {
                     // observe by-index array assignments, which left the last
                     // row stuck on "fire up"
                     this.items.splice(index, 1, data);
+                    this.record(data);
                     this.queueMedia(index, data.media);
                 })
                 .catch(() => {
                     // a failed request must not stall the crawl
-                    this.items.splice(index, 1, {
+                    const failed = {
                         ...this.items[index],
                         state: "extinguished",
                         error: this.$t("e9li.kirby-fire.error.request"),
-                    });
+                    };
+                    this.items.splice(index, 1, failed);
+                    this.record(failed);
                 })
                 .finally(() => {
                     setTimeout(() => {
@@ -324,6 +329,32 @@ export default {
         },
         pause() {
             this.isHeatingUp = false;
+            this.flushState();
+        },
+        // outcome bookkeeping — mirrored to the server so the CLI and
+        // later Panel loads present the same state. Media rows have no
+        // page id and are skipped.
+        record(item) {
+            if (!item.id) {
+                return;
+            }
+
+            const key = item.id + "|" + (item.language ?? "");
+
+            if (item.state === "no-store" || item.state === "extinguished") {
+                this.pending[key] = { state: item.state, error: item.error ?? null };
+            } else if (item.state === "fire-on") {
+                this.pending[key] = null;
+            }
+        },
+        flushState() {
+            if (Object.keys(this.pending).length === 0) {
+                return;
+            }
+
+            const results = this.pending;
+            this.pending = {};
+            this.$api.post("fire/state", { results }).catch(() => {});
         },
         reset() {
             this.isHeatingUp = false;

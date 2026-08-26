@@ -95,6 +95,7 @@ class Pages
     {
         return array_map(fn (array $target) => [
             'url' => $target['url'],
+            'id' => $target['page']->id(),
             'language' => $target['language'],
             'isErrorPage' => $target['isErrorPage'],
             'cached' => PagesCache::has($target['page'], $target['language']),

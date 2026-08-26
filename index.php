@@ -8,6 +8,7 @@ use E9li\Fire\Pages;
 use E9li\Fire\PagesCache;
 use E9li\Fire\Progress;
 use E9li\Fire\Renderer;
+use E9li\Fire\RunState;
 use E9li\Fire\Urls;
 use E9li\Fire\Warmer;
 use Kirby\Cms\App;
@@ -19,6 +20,7 @@ load([
     'e9li\\fire\\pagescache' => __DIR__ . '/src/PagesCache.php',
     'e9li\\fire\\progress' => __DIR__ . '/src/Progress.php',
     'e9li\\fire\\renderer' => __DIR__ . '/src/Renderer.php',
+    'e9li\\fire\\runstate' => __DIR__ . '/src/RunState.php',
     'e9li\\fire\\urls' => __DIR__ . '/src/Urls.php',
     'e9li\\fire\\warmer' => __DIR__ . '/src/Warmer.php',
 ]);
@@ -164,7 +166,12 @@ App::plugin('e9li/kirby-fire', [
                         }
                     }
 
-                    $targets[$url] = $item['isErrorPage'];
+                    $targets[$url] = [
+                        'isErrorPage' => $item['isErrorPage'],
+                        'id' => $item['id'],
+                        'language' => $item['language'],
+                        'key' => RunState::key($item['id'], $item['language']),
+                    ];
                 }
 
                 if ($alreadyCached > 0) {
@@ -176,6 +183,7 @@ App::plugin('e9li/kirby-fire', [
                 $failed = 0;
                 $uncacheable = 0;
                 $mediaQueue = [];
+                $stateChanges = [];
 
                 $progress = new Progress(count($targets), $cli->arg('quiet') !== true);
 
@@ -184,21 +192,38 @@ App::plugin('e9li/kirby-fire', [
                     array_keys($targets),
                     $concurrency,
                     true,
-                    function (string $url, array $result) use ($cli, $targets, $progress, &$pagesOn, &$failed, &$uncacheable, &$mediaQueue): void {
+                    function (string $url, array $result) use ($cli, $targets, $progress, $incremental, &$pagesOn, &$failed, &$uncacheable, &$mediaQueue, &$stateChanges): void {
+                        $meta = $targets[$url];
+
                         // the error page renders (and caches) with HTTP 404 by
                         // design — that is a warmed page, not a failure
-                        $expected404 = $targets[$url] === true && $result['status'] === 404;
+                        $expected404 = $meta['isErrorPage'] === true && $result['status'] === 404;
 
                         if ($result['status'] === 0 || ($result['status'] >= 400 && $expected404 === false)) {
                             $failed++;
-                            $progress->error($cli, $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
+                            $error = $result['error'] ?? 'HTTP ' . $result['status'];
+                            $stateChanges[$meta['key']] = ['state' => 'extinguished', 'error' => $error, 'time' => time()];
+                            $progress->error($cli, $url . ' → ' . $error);
                         } else {
                             $pagesOn++;
 
                             // a 200 whose response says no-store: served, but
                             // Kirby refused to cache it (session/cookies)
                             $noStore = $result['cacheable'] === false;
+
+                            // for local warms the disk is authoritative — it
+                            // also catches pages that disable caching without
+                            // the no-store header (response()->cache(false))
+                            if ($noStore === false && $incremental === true) {
+                                $page = kirby()->page($meta['id']);
+                                $noStore = $page !== null
+                                    && PagesCache::has($page, $meta['language']) === false;
+                            }
+
                             $uncacheable += $noStore ? 1 : 0;
+                            $stateChanges[$meta['key']] = $noStore
+                                ? ['state' => 'no-store', 'error' => null, 'time' => time()]
+                                : null;
 
                             $progress->advance(
                                 'fire up ' . $url
@@ -214,6 +239,9 @@ App::plugin('e9li/kirby-fire', [
                 );
 
                 $progress->finish();
+
+                // persist the outcomes, so the Panel presents the same state
+                RunState::update($stateChanges);
 
                 if ($skipMedia === false && $mediaQueue !== []) {
                     // status-only requests: the thumb is generated server-side
@@ -326,21 +354,32 @@ App::plugin('e9li/kirby-fire', [
 
                 $progress = new Progress(count($targets), $cli->arg('quiet') !== true);
 
-                Renderer::renderAll(function (array $result) use ($cli, $progress, $cacheActive, &$rendered, &$failed, &$uncached): void {
+                $stateChanges = [];
+
+                Renderer::renderAll(function (array $result) use ($cli, $progress, $cacheActive, &$rendered, &$failed, &$uncached, &$stateChanges): void {
+                    $key = RunState::key($result['id'], $result['language']);
+
                     if ($result['ok'] === false) {
                         $failed++;
+                        $stateChanges[$key] = ['state' => 'extinguished', 'error' => $result['error'], 'time' => time()];
                         $progress->error($cli, $result['url'] . ' → ' . $result['error']);
                     } else {
                         $rendered++;
 
                         $noStore = $cacheActive === true && $result['cached'] === false;
                         $uncached += $noStore ? 1 : 0;
+                        $stateChanges[$key] = $noStore
+                            ? ['state' => 'no-store', 'error' => null, 'time' => time()]
+                            : null;
 
                         $progress->advance('render ' . $result['url'] . ($noStore ? ' (not cacheable)' : ''));
                     }
                 }, $targets);
 
                 $progress->finish();
+
+                // persist the outcomes, so the Panel presents the same state
+                RunState::update($stateChanges);
 
                 $cli->br();
 
@@ -475,24 +514,43 @@ App::plugin('e9li/kirby-fire', [
                 'pattern' => 'fire/pages',
                 'method' => 'GET',
                 'action' => function (): array {
+                    // rows carry the shared state: cached pages from the
+                    // disk cache, problem pages (no-store, failed) with
+                    // their reasons from the last CLI or Panel run
+                    return RunState::apply(Pages::urls());
+                },
+            ],
+            [
+                'pattern' => 'fire/state',
+                'method' => 'POST',
+                'action' => function (): array {
+                    // the Panel crawls in the browser — it reports its
+                    // outcomes here so the CLI and later Panel loads
+                    // present the same state
+                    $changes = $this->requestBody('results');
+                    $clean = [];
 
-                    $data = [];
+                    foreach (is_array($changes) ? $changes : [] as $key => $entry) {
+                        if ($entry === null) {
+                            $clean[(string)$key] = null;
+                            continue;
+                        }
 
-                    foreach (Pages::urls() as $item) {
-                        $data[] = [
-                            'url' => $item['url'],
-                            'language' => $item['language'],
-                            // already-cached pages start as warmed — the row
-                            // states reflect the server-side cache, not just
-                            // what this browser session has crawled
-                            'state' => $item['cached'] === true ? 'fire-on' : 'no-fire',
-                            // the browser-side crawl counts a 404 from the
-                            // error page as warmed, like the CLI does
-                            'isErrorPage' => $item['isErrorPage'],
-                        ];
+                        if (
+                            is_array($entry) === true &&
+                            in_array($entry['state'] ?? null, ['no-store', 'extinguished'], true)
+                        ) {
+                            $clean[(string)$key] = [
+                                'state' => $entry['state'],
+                                'error' => isset($entry['error']) ? (string)$entry['error'] : null,
+                                'time' => time(),
+                            ];
+                        }
                     }
 
-                    return $data;
+                    RunState::update($clean);
+
+                    return ['ok' => true];
                 },
             ],
             [
