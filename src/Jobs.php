@@ -4,6 +4,7 @@ namespace E9li\Fire;
 
 use FilesystemIterator;
 use Kirby\Cms\Media;
+use Kirby\Cms\ModelWithContent;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
@@ -59,21 +60,13 @@ class Jobs
             $type = array_shift($parts);
             $id = implode('/', $parts);
 
-            $model = match ($type) {
-                'pages' => kirby()->page($id),
-                'site' => site(),
-                'users' => kirby()->user($id),
-                // custom assets are addressed by their path relative to the index
-                'assets' => $id,
-                default => null,
-            };
-
-            // A null model means the page/user was deleted but its media
-            // folder stayed behind. Reported rather than skipped: silently
-            // dropping them would read as "everything rendered" while images
-            // stay missing.
+            // Deliberately strings only: holding thousands of resolved page
+            // models here kept their loaded files collections alive for the
+            // whole run and exhausted shared-hosting memory limits. thumb()
+            // resolves each model just in time and purges it afterwards.
             $jobs[] = [
-                'model' => $model,
+                'type' => $type,
+                'id' => $id,
                 'hash' => $hash,
                 'filename' => $filename,
                 'path' => $path,
@@ -91,16 +84,35 @@ class Jobs
      */
     public static function thumb(array $job): array
     {
-        if ($job['model'] === null) {
+        $model = match ($job['type']) {
+            'pages' => kirby()->page($job['id']),
+            'site' => site(),
+            'users' => kirby()->user($job['id']),
+            // custom assets are addressed by their path relative to the index
+            'assets' => $job['id'],
+            default => null,
+        };
+
+        // A null model means the page/user was deleted but its media folder
+        // stayed behind. Reported rather than skipped: silently dropping it
+        // would read as "everything rendered" while images stay missing.
+        if ($model === null) {
             return ['ok' => false, 'error' => 'no page, site or user owns this job any more'];
         }
 
         try {
-            Media::thumb($job['model'], $job['hash'], $job['filename']);
+            Media::thumb($model, $job['hash'], $job['filename']);
 
             return ['ok' => true, 'error' => null];
         } catch (\Throwable $e) {
             return ['ok' => false, 'error' => $e->getMessage()];
+        } finally {
+            // drop the memoized files/children collections again — page
+            // objects stay referenced in the site tree, and without the
+            // purge their weight accumulates across thousands of jobs
+            if ($model instanceof ModelWithContent) {
+                $model->purge();
+            }
         }
     }
 }

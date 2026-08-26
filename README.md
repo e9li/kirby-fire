@@ -48,6 +48,16 @@ Every command exits non-zero when something failed, and the Kirby CLI's
 global `--quiet` flag silences the output — together that makes them
 cron-friendly: `kirby fire:render --fresh --quiet && kirby fire:thumbs --quiet`.
 
+**Warming is incremental**: pages that are already cached are skipped, so
+after an editor adds 20 pages, `fire:up` (or the Panel's fire button) warms
+exactly those 20. **`--fresh` is the full re-cache**: it flushes the pages
+cache first, so everything regenerates. There is deliberately no separate
+`--force` — requesting a cached page returns the cached copy without
+re-rendering, so a real re-cache always starts with a flush. In the Panel,
+"Clear cache" then the fire button is the same full rebuild. One exception:
+with a domain override the local cache says nothing about the target host,
+so everything is warmed.
+
 `fire:up` warms the page cache by requesting every page over HTTP — with up to
 `--concurrency` requests in flight — and picks the thumbs out of the returned
 `src`/`srcset` attributes so a crawl warms those too. Thumb requests are
@@ -57,6 +67,13 @@ before the first body byte, so the images themselves are never downloaded.
 The error page is warmed like any other page — an image-rich 404 page profits
 just as much. It answers with HTTP 404 by design, so for this one page that
 status counts as warmed instead of failed.
+
+A page can answer 200 and still not be cached: when its render starts a
+session or sets cookies, Kirby responds with `no-store` and skips the cache
+write. The commands report such pages ("not cacheable") instead of counting
+them as warmed — typical causes are `csrf()` or `$kirby->session()` in an
+always-rendered snippet (header, footer, popup). Fix the template, not the
+crawler: read cookies lazily, or fetch tokens and cart states via JS.
 
 Kirby does not generate a thumbnail while a page renders — it writes one job file
 per thumb and runs the darkroom only when the media URL is first requested. So
@@ -96,7 +113,14 @@ and every generated file belongs to the CLI user. Two caveats:
 
 ## Thumbs
 
-Two things to know about `fire:thumbs`:
+Three things to know about `fire:thumbs`:
+
+- Image decoding needs real memory (a 24 MP photo is ~100 MB in GD), so the
+  commands raise the CLI memory limit to the `memory` option (512M default).
+  On hosts where that is blocked, `fire:thumbs --limit 500` renders in
+  batches — finished jobs leave the queue, so repeated runs converge. If the
+  Imagick extension is available, `'thumbs' => ['driver' => 'imagick']`
+  avoids PHP's memory limit for pixel data entirely.
 
 - It can only render what a page render has already queued. With the page cache
   warm nothing re-renders, so **wiping the media folder means clearing the page
@@ -143,6 +167,9 @@ after testing, before you commit.
     // TLS certificates are verified by default; set to true for
     // local dev certificates (or pass --insecure to fire:up)
     'insecure' => false,
+    // CLI memory limit for the commands — image decoding is memory
+    // hungry; never lowers the environment's limit, false disables
+    'memory' => '512M',
     'ignore' => [
         // page ids to skip; append /* to ignore a whole branch:
         // 'data/*' skips data and every page below it

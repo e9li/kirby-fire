@@ -32,4 +32,51 @@ class Commands
             // pages cache not available — nothing to flush
         }
     }
+
+    /**
+     * Raises the CLI memory limit, like Composer does for itself: thumb
+     * generation decodes whole images into memory (a 24 MP photo needs
+     * ~100 MB in GD alone), and shared-hosting limits of 128 MB die
+     * mid-run — uncatchably. Never lowers an existing limit; set the
+     * memory option to false to keep the environment's limit.
+     */
+    public static function raiseMemory(): void
+    {
+        $target = kirby()->option('e9li.kirby-fire.memory', '512M');
+
+        if ($target === false) {
+            return;
+        }
+
+        $current = (string)ini_get('memory_limit');
+
+        if ($current === '-1') {
+            return;
+        }
+
+        if ((string)$target === '-1') {
+            @ini_set('memory_limit', '-1');
+
+            return;
+        }
+
+        if (static::toBytes((string)$target) > static::toBytes($current)) {
+            @ini_set('memory_limit', (string)$target);
+        }
+    }
+
+    /**
+     * php.ini shorthand (128M, 1G, 512K) to bytes.
+     */
+    public static function toBytes(string $value): float
+    {
+        $number = (float)$value;
+
+        return match (strtoupper(substr(trim($value), -1))) {
+            'K' => $number * 1024,
+            'M' => $number * 1024 ** 2,
+            'G' => $number * 1024 ** 3,
+            default => $number,
+        };
+    }
 }

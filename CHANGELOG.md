@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.4.5
+
+Memory hardening for large media libraries on constrained hosts, after a
+production run died at thumb 284 of 5296 with a 128 MB CLI limit — and
+honest reporting for pages Kirby refuses to cache.
+
+- **The Panel follows the crawl.** The view auto-scrolls to keep the row
+  currently being warmed in sight — on a 3000-row site you no longer lose
+  track. Scrolling manually pauses the follow immediately (the view never
+  fights the user); a floating flame button jumps back to the action, and a
+  back-to-top button appears once the list header leaves the viewport.
+- **Warming is incremental now.** `fire:up`, `fire:render` and the Panel's
+  fire button skip pages that are provably cached on disk (the same
+  per-page check that powers the Panel's green rows) — adding 20 pages
+  warms exactly those 20. `--fresh` and the Panel's "Clear cache" remain
+  the full-rebuild path; a domain override warms everything, since the
+  local cache says nothing about another host.
+- **Uncacheable pages are reported instead of celebrated.** A response can
+  be HTTP 200 and still warm nothing: when a page's render starts a session
+  or sets cookies, Kirby answers `no-store` and skips the cache write.
+  `fire:up` and `fire:render` now count and list such pages with a clear
+  warning naming the typical causes (`csrf()` or `$kirby->session()` in an
+  always-rendered snippet), the summary only counts pages actually cached,
+  and the Panel shows them with their own "not cacheable" state instead of
+  a green "fire on". Found on a production site where an entire section was
+  silently uncacheable while the crawl reported success.
+
+- The commands raise the CLI memory limit to the new `memory` option
+  (default `512M`), the way Composer does for itself: image decoding is
+  memory hungry (a 24 MP photo needs ~100 MB in GD alone) and memory
+  exhaustion is uncatchable — prevention is the only defense. An existing
+  higher or unlimited limit is never lowered; `'memory' => false` keeps
+  the environment's limit.
+- `fire:thumbs` no longer accumulates page models: jobs carry plain
+  type/id strings, each model resolves just in time and its memoized
+  files/children collections are purged after the thumb — thousands of
+  jobs stay flat in memory instead of growing until the limit kills the
+  run. Reference cycles are collected periodically.
+- New `fire:thumbs --limit N`: render at most N thumbs and report how many
+  jobs are left. Finished jobs leave the queue, so repeated limited runs
+  converge — for hosts where even the raised limit is not available.
+- If the host has the Imagick extension, `'thumbs' => ['driver' =>
+  'imagick']` in the site config avoids PHP's memory limit for pixel data
+  entirely — worth preferring over GD on shared hosting.
+
 ## 0.4.4
 
 - `ignore.page` supports branch rules: `'data/*'` skips `data` and every

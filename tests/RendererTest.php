@@ -68,6 +68,27 @@ class RendererTest extends TestCase
         $this->assertFalse(PagesCache::has($home, 'nl'));
     }
 
+    public function testDetectsRendersKirbyRefusedToCache(): void
+    {
+        // the "secret" fixture page's template starts a session, so Kirby
+        // renders it fine but silently skips the cache write — the result
+        // must expose that instead of counting the page as warmed
+        $this->renderApp([
+            'roots' => [
+                'content' => __DIR__ . '/fixtures/content-session',
+            ],
+        ]);
+
+        $results = Renderer::renderAll();
+        $byUrl = array_column($results, null, 'url');
+
+        $this->assertTrue($byUrl[self::BASE]['ok']);
+        $this->assertTrue($byUrl[self::BASE]['cached']);
+
+        $this->assertTrue($byUrl[self::BASE . '/secret']['ok']);
+        $this->assertFalse($byUrl[self::BASE . '/secret']['cached']);
+    }
+
     public function testReportsRenderFailuresWithoutAborting(): void
     {
         $this->renderApp([

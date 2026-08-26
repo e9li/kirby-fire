@@ -77,7 +77,8 @@ class Warmer
                 $status = $response->getStatusCode();
                 // no throwing on 4xx/5xx — a 404 body is the rendered error page
                 $content = $response->getContent(false);
-                $type = $response->getHeaders(false)['content-type'][0] ?? '';
+                $headers = $response->getHeaders(false);
+                $type = $headers['content-type'][0] ?? '';
             } catch (\Throwable $e) {
                 if ($attempt === 1) {
                     continue;
@@ -87,13 +88,22 @@ class Warmer
                     'status' => 0,
                     'error' => $e->getMessage(),
                     'media' => [],
+                    'cacheable' => null,
                 ];
             }
+
+            $isHtml = str_contains($type, 'text/html');
 
             return [
                 'status' => $status,
                 'error' => null,
-                'media' => str_contains($type, 'text/html') ? Urls::media($content) : [],
+                'media' => $isHtml ? Urls::media($content) : [],
+                // Kirby answers with no-store when it refuses to cache a
+                // page (session started, cookies set) — a 200 that warms
+                // nothing; callers surface this instead of celebrating it
+                'cacheable' => $isHtml
+                    ? str_contains($headers['cache-control'][0] ?? '', 'no-store') === false
+                    : null,
             ];
         }
     }
@@ -125,7 +135,7 @@ class Warmer
                 // scheme when the url option is not set) — fail this one
                 // URL instead of aborting the whole run; no retry, the
                 // error is permanent
-                $results[$url] = ['status' => 0, 'error' => $e->getMessage(), 'media' => []];
+                $results[$url] = ['status' => 0, 'error' => $e->getMessage(), 'media' => [], 'cacheable' => null];
 
                 if ($onResult !== null) {
                     $onResult($url, $results[$url]);
@@ -172,7 +182,7 @@ class Warmer
 
                             if ($bodies === false) {
                                 $response->cancel();
-                                $finish($meta, ['status' => $status, 'error' => null, 'media' => []]);
+                                $finish($meta, ['status' => $status, 'error' => null, 'media' => [], 'cacheable' => null]);
                                 break;
                             }
 
@@ -181,15 +191,18 @@ class Warmer
 
                         if ($chunk->isLast() === true) {
                             $status = $response->getStatusCode();
-                            $type = $response->getHeaders(false)['content-type'][0] ?? '';
+                            $headers = $response->getHeaders(false);
+                            $type = $headers['content-type'][0] ?? '';
                             $content = $bodies ? $response->getContent(false) : '';
+                            $isHtml = $bodies === true && str_contains($type, 'text/html');
 
                             $finish($meta, [
                                 'status' => $status,
                                 'error' => null,
-                                'media' => $bodies === true && str_contains($type, 'text/html')
-                                    ? Urls::media($content)
-                                    : [],
+                                'media' => $isHtml ? Urls::media($content) : [],
+                                'cacheable' => $isHtml
+                                    ? str_contains($headers['cache-control'][0] ?? '', 'no-store') === false
+                                    : null,
                             ]);
                             break;
                         }
@@ -199,7 +212,7 @@ class Warmer
                         if ($meta['attempt'] === 1) {
                             $request($meta['url'], 2);
                         } else {
-                            $results[$meta['url']] = ['status' => 0, 'error' => $e->getMessage(), 'media' => []];
+                            $results[$meta['url']] = ['status' => 0, 'error' => $e->getMessage(), 'media' => [], 'cacheable' => null];
 
                             if ($onResult !== null) {
                                 $onResult($meta['url'], $results[$meta['url']]);
@@ -220,7 +233,7 @@ class Warmer
                     if ($meta['attempt'] === 1) {
                         $request($meta['url'], 2);
                     } else {
-                        $results[$meta['url']] = ['status' => 0, 'error' => $e->getMessage(), 'media' => []];
+                        $results[$meta['url']] = ['status' => 0, 'error' => $e->getMessage(), 'media' => [], 'cacheable' => null];
 
                         if ($onResult !== null) {
                             $onResult($meta['url'], $results[$meta['url']]);

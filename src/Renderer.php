@@ -52,9 +52,17 @@ class Renderer
 
             try {
                 $target['page']->render();
-                $result = ['url' => $target['url'], 'ok' => true, 'error' => null];
+                $result = [
+                    'url' => $target['url'],
+                    'ok' => true,
+                    'error' => null,
+                    // rendered fine, but did Kirby actually write the cache?
+                    // It silently skips pages whose render touches the
+                    // session or sets cookies — callers surface that
+                    'cached' => PagesCache::has($target['page'], $target['language']),
+                ];
             } catch (\Throwable $e) {
-                $result = ['url' => $target['url'], 'ok' => false, 'error' => $e->getMessage()];
+                $result = ['url' => $target['url'], 'ok' => false, 'error' => $e->getMessage(), 'cached' => false];
             }
 
             $inFlight = null;

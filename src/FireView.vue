@@ -41,6 +41,7 @@
                                 <k-icon v-if="item.state === 'no-fire'" type="blaze"/>
                                 <k-icon v-if="item.state === 'fire-up'" type="fire"/>
                                 <k-icon v-if="item.state === 'fire-on'" type="fireFilled"/>
+                                <k-icon v-if="item.state === 'no-store'" type="alert"/>
                                 <k-icon v-if="item.state === 'extinguished'" type="cancel"/>
                                 <span>{{ stateText(item.state) }}</span>
                             </div>
@@ -50,6 +51,26 @@
                 </table>
             </div>
         </k-grid>
+
+        <div class="k-fire-fabs">
+            <k-button
+                v-if="isHeatingUp && !followCrawl"
+                icon="fire"
+                variant="filled"
+                theme="positive"
+                size="lg"
+                :title="$t('e9li.kirby-fire.button.follow')"
+                @click="resumeFollow()"
+            />
+            <k-button
+                v-if="showTop"
+                icon="angle-up"
+                variant="filled"
+                size="lg"
+                :title="$t('e9li.kirby-fire.button.top')"
+                @click="scrollTop()"
+            />
+        </div>
 
     </k-panel-inside>
 </template>
@@ -67,6 +88,8 @@ export default {
             items: [],
             known: new Set(),
             origins: new Set(),
+            followCrawl: true,
+            showTop: false,
             status: {
                 active: null,
                 count: null,
@@ -75,6 +98,35 @@ export default {
     },
     created() {
         this.load();
+    },
+    mounted() {
+        // manual scrolling (wheel/touch) pauses the auto-follow — the view
+        // must never fight the user for the scroll position. Deliberately
+        // not the "scroll" event: our own scrollIntoView fires that too.
+        this._scrollIntent = () => {
+            if (this.isHeatingUp) {
+                this.followCrawl = false;
+            }
+        };
+        // back-to-top visibility, rAF-throttled, container-agnostic
+        this._scrollSpy = () => {
+            if (this._scrollRaf) {
+                return;
+            }
+            this._scrollRaf = requestAnimationFrame(() => {
+                this._scrollRaf = null;
+                const head = this.$el.querySelector("thead");
+                this.showTop = head ? head.getBoundingClientRect().top < 0 : false;
+            });
+        };
+        window.addEventListener("wheel", this._scrollIntent, { capture: true, passive: true });
+        window.addEventListener("touchmove", this._scrollIntent, { capture: true, passive: true });
+        window.addEventListener("scroll", this._scrollSpy, { capture: true, passive: true });
+    },
+    beforeDestroy() {
+        window.removeEventListener("wheel", this._scrollIntent, { capture: true });
+        window.removeEventListener("touchmove", this._scrollIntent, { capture: true });
+        window.removeEventListener("scroll", this._scrollSpy, { capture: true });
     },
     methods: {
         stateText(state) {
@@ -145,7 +197,14 @@ export default {
                     ? this.mediaUrls(await response.text())
                     : [];
 
-                return { ...item, state: "fire-on", error: null, media };
+                // no-store means Kirby refused to cache the response
+                // (session started, cookies set) — served, but not warmed
+                const cacheControl = response.headers.get("cache-control") || "";
+                const state = type.includes("text/html") && cacheControl.includes("no-store")
+                    ? "no-store"
+                    : "fire-on";
+
+                return { ...item, state, error: null, media };
             } catch {
                 // cross-origin (a language on its own domain) or a network
                 // failure — fall back to the server-side warm route
@@ -177,6 +236,14 @@ export default {
             }
         },
         heatUp(index) {
+            // rows that are provably cached on disk stay green — the crawl
+            // fills the gaps. "Clear cache" resets every row for a full
+            // re-warm. (A loop, not recursion: thousands of cached rows
+            // would blow the call stack.)
+            while (index < this.items.length && this.items[index].state === "fire-on") {
+                index++;
+            }
+
             this.index = index;
 
             // past the last row: the crawl is complete — back to the idle
@@ -200,6 +267,7 @@ export default {
             }
 
             this.items[index].state = "fire-up";
+            this.scrollToActive(index);
 
             this.warm(this.items[index])
                 .then((data) => {
@@ -225,7 +293,34 @@ export default {
         },
         start() {
             this.isHeatingUp = true;
+            this.followCrawl = true;
             this.heatUp(this.index);
+        },
+        scrollToActive(index) {
+            if (this.followCrawl === false) {
+                return;
+            }
+
+            this.$el.querySelectorAll("tbody tr")[index]?.scrollIntoView({ block: "center" });
+        },
+        resumeFollow() {
+            this.followCrawl = true;
+            this.scrollToActive(Math.min(this.index, this.items.length - 1));
+        },
+        scrollTop() {
+            // going to the top is a manual scroll intent — without this the
+            // crawl's auto-follow immediately drags the view back down
+            this.followCrawl = false;
+
+            // scroll the real container: the panel header is sticky, so
+            // scrollIntoView on it is a no-op ("already visible")
+            let el = this.$el;
+
+            while (el && el.scrollHeight <= el.clientHeight) {
+                el = el.parentElement;
+            }
+
+            (el || document.scrollingElement).scrollTo({ top: 0, behavior: "smooth" });
         },
         pause() {
             this.isHeatingUp = false;
@@ -250,6 +345,20 @@ export default {
     margin-bottom: var(--spacing-4);
     color: var(--color-text-dimmed);
     font-size: var(--text-sm);
+}
+
+.k-fire-fabs {
+    position: fixed;
+    right: var(--spacing-6);
+    bottom: var(--spacing-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    z-index: 100;
+}
+
+.k-fire-fabs .k-button {
+    box-shadow: var(--shadow-lg);
 }
 
 .k-table-index-column {
@@ -291,6 +400,12 @@ export default {
     padding-left: var(--spacing-1);
     background: var(--color-green-300);
     color: var(--color-green-800);
+}
+
+.no-store {
+    padding-left: var(--spacing-1);
+    background: var(--color-orange-300);
+    color: var(--color-orange-800);
 }
 
 .extinguished {

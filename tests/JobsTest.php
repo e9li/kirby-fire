@@ -3,8 +3,6 @@
 namespace E9li\Fire\Tests;
 
 use E9li\Fire\Jobs;
-use Kirby\Cms\Page;
-use Kirby\Cms\Site;
 
 class JobsTest extends TestCase
 {
@@ -26,7 +24,7 @@ class JobsTest extends TestCase
         $this->assertSame([], Jobs::all());
     }
 
-    public function testFindsAndResolvesJobs(): void
+    public function testFindsAndParsesJobs(): void
     {
         // media/pages/<id>/<hash>/.jobs/<filename>.json
         $this->job('pages/home/abc-123/.jobs/img-400x.jpg.json');
@@ -45,18 +43,19 @@ class JobsTest extends TestCase
         $byPath = array_column($jobs, null, 'path');
 
         $page = $byPath['pages/home/abc-123/.jobs/img-400x.jpg.json'];
-        $this->assertInstanceOf(Page::class, $page['model']);
-        $this->assertSame('home', $page['model']->id());
+        $this->assertSame('pages', $page['type']);
+        $this->assertSame('home', $page['id']);
         $this->assertSame('abc-123', $page['hash']);
         $this->assertSame('img-400x.jpg', $page['filename']);
 
         $site = $byPath['site/def-456/.jobs/logo-100x.png.json'];
-        $this->assertInstanceOf(Site::class, $site['model']);
+        $this->assertSame('site', $site['type']);
         $this->assertSame('logo-100x.png', $site['filename']);
 
         // custom assets are addressed by their path relative to the index
         $asset = $byPath['assets/css/images/ghi-789/.jobs/bg-50x.jpg.json'];
-        $this->assertSame('css/images', $asset['model']);
+        $this->assertSame('assets', $asset['type']);
+        $this->assertSame('css/images', $asset['id']);
         $this->assertSame('ghi-789', $asset['hash']);
     }
 
@@ -68,11 +67,45 @@ class JobsTest extends TestCase
 
         $jobs = Jobs::all();
         $this->assertCount(1, $jobs);
-
-        // blog/2026/post does not exist in the fixtures: the id must still
-        // parse correctly and the orphaned job must be reported, not dropped
-        $this->assertNull($jobs[0]['model']);
+        $this->assertSame('pages', $jobs[0]['type']);
+        $this->assertSame('blog/2026/post', $jobs[0]['id']);
         $this->assertSame('abc-123', $jobs[0]['hash']);
         $this->assertSame('hero-800x.jpg', $jobs[0]['filename']);
+    }
+
+    public function testThumbReportsOrphanedJobs(): void
+    {
+        $this->app();
+
+        // blog/2026/post does not exist in the fixtures: the orphaned job
+        // must be reported, not dropped
+        $result = Jobs::thumb([
+            'type' => 'pages',
+            'id' => 'blog/2026/post',
+            'hash' => 'abc-123',
+            'filename' => 'hero-800x.jpg',
+            'path' => 'pages/blog/2026/post/abc-123/.jobs/hero-800x.jpg.json',
+        ]);
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('no page, site or user owns this job any more', $result['error']);
+    }
+
+    public function testThumbResolvesExistingModelsLazily(): void
+    {
+        $this->app();
+
+        // home exists: the job fails in core (no real job file), but with a
+        // media error — not the orphan message — proving the model resolved
+        $result = Jobs::thumb([
+            'type' => 'pages',
+            'id' => 'home',
+            'hash' => 'abc-123',
+            'filename' => 'img-400x.jpg',
+            'path' => 'pages/home/abc-123/.jobs/img-400x.jpg.json',
+        ]);
+
+        $this->assertFalse($result['ok']);
+        $this->assertNotSame('no page, site or user owns this job any more', $result['error']);
     }
 }

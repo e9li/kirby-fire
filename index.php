@@ -36,6 +36,9 @@ App::plugin('e9li/kirby-fire', [
         'insecure' => false,
         'timeout' => 60,
         'concurrency' => 5,
+        // CLI memory limit for the commands (image decoding is memory
+        // hungry); never lowers the environment's limit, false disables
+        'memory' => '512M',
     ],
     'translations' => [
         'en' => require __DIR__ . '/translations/en.php',
@@ -80,6 +83,8 @@ App::plugin('e9li/kirby-fire', [
 
                 $cli->br();
                 $cli->bold('Fire up the cache...');
+
+                Commands::raiseMemory();
 
                 Commands::cacheWarning($cli);
 
@@ -128,13 +133,26 @@ App::plugin('e9li/kirby-fire', [
                     ?: kirby()->option('e9li.kirby-fire.concurrency', 5)));
                 $client = Warmer::client($cli->arg('insecure') === true ? true : null);
 
+                // incremental by default: pages that are provably cached on
+                // disk are skipped, so a run after adding 20 pages warms
+                // exactly those 20 — except when a domain override points at
+                // another host, whose cache state the local disk cannot know
+                $incremental = empty($domain) === true
+                    || rtrim($domain, '/') === rtrim(kirby()->url(), '/');
+
                 // resolve every target URL first — the crawl runs with
                 // $concurrency requests in flight, so results arrive in
                 // completion order and need their per-URL context up front
                 $targets = [];
                 $skipped = 0;
+                $alreadyCached = 0;
 
                 foreach (Pages::urls() as $item) {
+                    if ($incremental === true && $item['cached'] === true) {
+                        $alreadyCached++;
+                        continue;
+                    }
+
                     $url = $item['url'];
 
                     if (empty($domain) === false) {
@@ -149,9 +167,14 @@ App::plugin('e9li/kirby-fire', [
                     $targets[$url] = $item['isErrorPage'];
                 }
 
+                if ($alreadyCached > 0) {
+                    $cli->out($alreadyCached . ' page(s) already cached — skipped. Use --fresh for a full rebuild.');
+                }
+
                 $pagesOn = 0;
                 $mediaOn = 0;
                 $failed = 0;
+                $uncacheable = 0;
                 $mediaQueue = [];
 
                 $progress = new Progress(count($targets), $cli->arg('quiet') !== true);
@@ -161,7 +184,7 @@ App::plugin('e9li/kirby-fire', [
                     array_keys($targets),
                     $concurrency,
                     true,
-                    function (string $url, array $result) use ($cli, $targets, $progress, &$pagesOn, &$failed, &$mediaQueue): void {
+                    function (string $url, array $result) use ($cli, $targets, $progress, &$pagesOn, &$failed, &$uncacheable, &$mediaQueue): void {
                         // the error page renders (and caches) with HTTP 404 by
                         // design — that is a warmed page, not a failure
                         $expected404 = $targets[$url] === true && $result['status'] === 404;
@@ -171,7 +194,17 @@ App::plugin('e9li/kirby-fire', [
                             $progress->error($cli, $url . ' → ' . ($result['error'] ?? 'HTTP ' . $result['status']));
                         } else {
                             $pagesOn++;
-                            $progress->advance('fire up ' . $url . ($expected404 ? ' (error page, 404 expected)' : ''));
+
+                            // a 200 whose response says no-store: served, but
+                            // Kirby refused to cache it (session/cookies)
+                            $noStore = $result['cacheable'] === false;
+                            $uncacheable += $noStore ? 1 : 0;
+
+                            $progress->advance(
+                                'fire up ' . $url
+                                . ($expected404 ? ' (error page, 404 expected)' : '')
+                                . ($noStore ? ' (not cacheable)' : '')
+                            );
 
                             foreach ($result['media'] as $mediaUrl) {
                                 $mediaQueue[$mediaUrl] = true;
@@ -216,7 +249,13 @@ App::plugin('e9li/kirby-fire', [
                     $cli->error(' ' . $failed . ' URL(s) failed — see above. ');
                 }
 
-                $cli->success(' Cache is on (' . $pagesOn . ' pages, ' . $mediaOn . ' media files), site is ready! ');
+                if ($uncacheable > 0) {
+                    $cli->error(' ' . $uncacheable . ' page(s) answered with no-store — Kirby did not cache them! ');
+                    $cli->out('Their responses start a session or set cookies. Typical causes: csrf()');
+                    $cli->out('or $kirby->session() in an always-rendered snippet (header, footer, popup).');
+                }
+
+                $cli->success(' Cache is on (' . ($pagesOn - $uncacheable + $alreadyCached) . ' pages cached, ' . $mediaOn . ' media files), site is ready! ');
 
                 if ($skipMedia === true) {
                     $cli->out('Thumbs were skipped — run "kirby fire:thumbs" to generate them.');
@@ -244,6 +283,8 @@ App::plugin('e9li/kirby-fire', [
                 $cli->br();
                 $cli->bold('Render pages into the cache...');
 
+                Commands::raiseMemory();
+
                 Commands::cacheWarning($cli);
 
                 // rendered URLs come from the configured url, not from a
@@ -259,17 +300,43 @@ App::plugin('e9li/kirby-fire', [
 
                 $rendered = 0;
                 $failed = 0;
+                $uncached = 0;
+                $alreadyCached = 0;
+                $cacheActive = (kirby()->cache('pages')->options()['active'] ?? false) === true;
 
                 $targets = Pages::targets();
+
+                // incremental by default: skip pages that are provably
+                // cached on disk — --fresh flushes first for a full rebuild
+                if ($cacheActive === true) {
+                    $targets = array_values(array_filter($targets, function (array $target) use (&$alreadyCached): bool {
+                        if (PagesCache::has($target['page'], $target['language']) === true) {
+                            $alreadyCached++;
+
+                            return false;
+                        }
+
+                        return true;
+                    }));
+                }
+
+                if ($alreadyCached > 0) {
+                    $cli->out($alreadyCached . ' page(s) already cached — skipped. Use --fresh for a full rebuild.');
+                }
+
                 $progress = new Progress(count($targets), $cli->arg('quiet') !== true);
 
-                Renderer::renderAll(function (array $result) use ($cli, $progress, &$rendered, &$failed): void {
+                Renderer::renderAll(function (array $result) use ($cli, $progress, $cacheActive, &$rendered, &$failed, &$uncached): void {
                     if ($result['ok'] === false) {
                         $failed++;
                         $progress->error($cli, $result['url'] . ' → ' . $result['error']);
                     } else {
                         $rendered++;
-                        $progress->advance('render ' . $result['url']);
+
+                        $noStore = $cacheActive === true && $result['cached'] === false;
+                        $uncached += $noStore ? 1 : 0;
+
+                        $progress->advance('render ' . $result['url'] . ($noStore ? ' (not cacheable)' : ''));
                     }
                 }, $targets);
 
@@ -281,7 +348,13 @@ App::plugin('e9li/kirby-fire', [
                     $cli->error(' ' . $failed . ' page(s) failed — see above. ');
                 }
 
-                $cli->success(' ' . $rendered . ' page(s) rendered, cache is on. ');
+                if ($uncached > 0) {
+                    $cli->error(' ' . $uncached . ' page(s) rendered but were not cached! ');
+                    $cli->out('Their render starts a session or sets cookies. Typical causes: csrf()');
+                    $cli->out('or $kirby->session() in an always-rendered snippet (header, footer, popup).');
+                }
+
+                $cli->success(' ' . ($rendered - $uncached) . ' page(s) rendered into the cache. ');
                 $cli->out('Run "kirby fire:thumbs" to generate the queued thumbs.');
                 $cli->br();
 
@@ -293,11 +366,18 @@ App::plugin('e9li/kirby-fire', [
         'fire:thumbs' => [
             'description' => 'generate pending thumbnails',
             'args' => [
+                'limit' => [
+                    'description' => 'Render at most this many thumbs, then stop',
+                    'longPrefix' => 'limit',
+                    'castTo' => 'int',
+                ],
             ],
             'command' => function ($cli): void {
 
                 $cli->br();
                 $cli->bold('Render pending thumbs...');
+
+                Commands::raiseMemory();
 
                 $jobs = Jobs::all();
 
@@ -310,8 +390,18 @@ App::plugin('e9li/kirby-fire', [
                     return;
                 }
 
+                // batching for very constrained environments: finished jobs
+                // disappear from the queue, so repeated limited runs converge
+                $total = count($jobs);
+                $limit = (int)$cli->arg('limit');
+
+                if ($limit > 0 && $limit < $total) {
+                    $jobs = array_slice($jobs, 0, $limit);
+                }
+
                 $rendered = 0;
                 $failed = 0;
+                $i = 0;
 
                 $progress = new Progress(count($jobs), $cli->arg('quiet') !== true);
 
@@ -325,6 +415,12 @@ App::plugin('e9li/kirby-fire', [
                         $rendered++;
                         $progress->advance($job['filename']);
                     }
+
+                    // page objects reference each other in cycles; collect
+                    // them periodically so long runs stay flat in memory
+                    if (++$i % 250 === 0) {
+                        gc_collect_cycles();
+                    }
                 }
 
                 $progress->finish();
@@ -336,6 +432,11 @@ App::plugin('e9li/kirby-fire', [
                 }
 
                 $cli->success(' ' . $rendered . ' thumb(s) rendered ');
+
+                if (($left = $total - count($jobs)) > 0) {
+                    $cli->out($left . ' job(s) left — run "kirby fire:thumbs" again.');
+                }
+
                 $cli->br();
 
                 if ($failed > 0) {
@@ -430,7 +531,7 @@ App::plugin('e9li/kirby-fire', [
                     return [
                         'url' => $url,
                         'language' => $language,
-                        'state' => 'fire-on',
+                        'state' => $result['cacheable'] === false ? 'no-store' : 'fire-on',
                         'media' => $result['media'],
                     ];
                 },

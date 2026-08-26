@@ -30,7 +30,38 @@ class EngineTest extends TestCase
             'status' => 200,
             'error' => null,
             'media' => ['https://example.test/media/pages/home/1/img-400x.jpg'],
+            'cacheable' => true,
         ], Warmer::warm($client, 'https://example.test'));
+    }
+
+    public function testWarmDetectsUncacheableResponses(): void
+    {
+        // Kirby answers with no-store when it refuses to cache a page
+        // (session started, cookies set) — a 200 that warms nothing
+        $this->app();
+
+        $client = new MockHttpClient(new MockResponse('<h1>ok</h1>', [
+            'response_headers' => [
+                'content-type' => 'text/html; charset=utf-8',
+                'cache-control' => 'no-store, private',
+            ],
+        ]));
+
+        $result = Warmer::warm($client, 'https://example.test');
+
+        $this->assertSame(200, $result['status']);
+        $this->assertFalse($result['cacheable']);
+    }
+
+    public function testWarmMarksNormalHtmlAsCacheable(): void
+    {
+        $this->app();
+
+        $this->assertTrue(Warmer::warm(new MockHttpClient($this->html('<h1>ok</h1>')), 'https://example.test')['cacheable']);
+
+        // non-HTML responses carry no cacheability verdict
+        $binary = new MockResponse('bytes', ['response_headers' => ['content-type' => 'image/jpeg']]);
+        $this->assertNull(Warmer::warm(new MockHttpClient($binary), 'https://example.test/i.jpg')['cacheable']);
     }
 
     public function testWarmReportsHttpErrorsWithoutThrowing(): void
@@ -148,7 +179,7 @@ class EngineTest extends TestCase
         $results = Warmer::warmAll($client, ['https://example.test/media/x.jpg'], 5, false);
 
         $this->assertSame(
-            ['status' => 200, 'error' => null, 'media' => []],
+            ['status' => 200, 'error' => null, 'media' => [], 'cacheable' => null],
             $results['https://example.test/media/x.jpg']
         );
     }

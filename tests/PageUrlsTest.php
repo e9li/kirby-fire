@@ -68,6 +68,11 @@ class PageUrlsTest extends TestCase
 
         $this->assertTrue($byUrl[self::BASE]['cached']);
         $this->assertFalse($byUrl[self::BASE . '/about']['cached']);
+
+        // the incremental crawl partitions on exactly this flag: a warmed
+        // home page leaves only the uncached pages as targets
+        $missing = array_filter(Pages::urls(), fn (array $item) => $item['cached'] === false);
+        $this->assertCount(2, $missing); // about + error
     }
 
     public function testBranchIgnoresSkipWholeSubtrees(): void
